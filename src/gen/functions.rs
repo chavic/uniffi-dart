@@ -19,7 +19,7 @@ use super::utils::{fn_name, var_name};
 //     let args = quote!($(for arg in &fun.arguments() => $(&arg.as_renderable().render_type(&arg.as_type(), type_helper)) $(var_name(arg.name())),));
 //     let ff_name = ffi.name();
 //     let inner = quote! {
-//     rustCall(api, (res) =>
+//     rustCall((res) =>
 //         _$(&fn_name)(
 //             $(for arg in &fun.arguments() => $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(var_name(arg.name()))))),)
 //         res)

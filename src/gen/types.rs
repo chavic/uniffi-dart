@@ -211,7 +211,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //         throw callStatus.ref.errorBuf;
             //     case CALL_PANIC:
             //         if (callStatus.ref.errorBuf.len > 0) {
-            //             final message = liftString(api, callStatus.ref.errorBuf.toIntList());
+            //             final message = liftString(callStatus.ref.errorBuf.toIntList());
             //             calloc.free(callStatus);
             //             throw UniffiInternalError.panicked(message);
             //         } else {
@@ -238,7 +238,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //             RustBuffer Function(ForeignBytes, Pointer<RustCallStatus>)>>($(format!("\"{}\"", self.ci.ffi_rustbuffer_from_bytes().name())));
             //         final _fromBytes =
             //         _fromBytesPtr.asFunction<RustBuffer Function(ForeignBytes, Pointer<RustCallStatus>)>();
-            //         return rustCall(api, (res) => _fromBytes(bytes, res));
+            //         return rustCall((res) => _fromBytes(bytes, res));
             //     }
 
             //     // Needed so that the foreign language bindings can create buffers in which to pass complex data types across the FFI in the future
@@ -247,7 +247,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //             NativeFunction<
             //                 RustBuffer Function(Int64, Pointer<RustCallStatus>)>>($(format!("\"{}\"", self.ci.ffi_rustbuffer_alloc().name())));
             //         final _allocate = _allocatePtr.asFunction<RustBuffer Function(int, Pointer<RustCallStatus>)>();
-            //         return rustCall(api, (res) => _allocate(size, res));
+            //         return rustCall((res) => _allocate(size, res));
             //     }
 
             //     void deallocate(Api api) {
@@ -255,7 +255,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //         NativeFunction<
             //             Void Function(RustBuffer, Pointer<RustCallStatus>)>>($(format!("\"{}\"", self.ci.ffi_rustbuffer_free().name())));
             //         final _free = _freePtr.asFunction<void Function(RustBuffer, Pointer<RustCallStatus>)>();
-            //         rustCall(api, (res) => _free(this, res));
+            //         rustCall((res) => _free(this, res));
             //     }
 
             //     Uint8List toIntList() {
@@ -289,14 +289,14 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
             //     RustBuffer lowerIntoRustBuffer(T value) {
             //       throw UnimplementedError("lower into rust implement lift from rust buffer");
-            //       // final rbuf = RustBuffer.allocate(api, size());
+            //       // final rbuf = RustBuffer.allocate(size());
             //       // try {
             //       //   final bbuf = rbuf.data.asByteBuffer(0, rbuf.capacity);
             //       //   write(value, bbuf);
             //       //   rbuf.len = bbuf.position();
             //       //   return rbuf;
             //       // } catch (e) {
-            //       //   RustBuffer.deallocate(api, rbuf);
+            //       //   RustBuffer.deallocate(rbuf);
             //       //   throw e;
             //       // }
             //     }
@@ -320,9 +320,9 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             // abstract class FfiConverterRustBuffer<T>
             //       implements FfiConverter<T, RustBuffer> {
             //     @override
-            //     T lift(RustBuffer value, [int offset = 0]) => this.liftFromRustBuffer(api, value);
+            //     T lift(RustBuffer value, [int offset = 0]) => this.liftFromRustBuffer(value);
             //     @override
-            //     RustBuffer lower(T value) => this.lowerIntoRustBuffer(api, value);
+            //     RustBuffer lower(T value) => this.lowerIntoRustBuffer(value);
             // }
 
             // String liftString(Uint8List input) {
@@ -347,27 +347,27 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //     final bytes = calloc<ForeignBytes>();
             //     bytes.ref.len = length;
             //     bytes.ref.data = frameData;
-            //     return RustBuffer.fromBytes(api, bytes.ref);
+            //     return RustBuffer.fromBytes(bytes.ref);
             // }
 
-            // T? liftOptional<T>(Uint8List buf, T? Function(Api, Uint8List) lifter) {
+            // T? liftOptional<T>(Uint8List buf, T? Function(Uint8List) lifter) {
             //     if (buf.isEmpty || buf.first == 0){
             //         return null;
             //     }
-            //     return lifter(api, buf);
+            //     return lifter(buf);
             // }
 
             //$(primitives::generate_wrapper_lifters())
 
 
-            // Uint8List lowerOptional<T>(T? inp, Uint8List Function(Api, T) lowerer) {
+            // Uint8List lowerOptional<T>(T? inp, Uint8List Function(T) lowerer) {
             //     if (inp == null) {
             //         final res = Uint8List(1);
             //         res.first = 0;
             //         return res;
             //     }
             //     // converting the inner
-            //     final inner = lowerer(api, inp);
+            //     final inner = lowerer(inp);
             //     // preparing the outer
             //     final offset = 5;
             //     final res = Uint8List(inner.length + offset);

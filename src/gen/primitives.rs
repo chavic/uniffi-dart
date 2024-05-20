@@ -133,7 +133,7 @@ macro_rules! impl_renderable_for_primitive {
                             final buf = Uint8List(this.size());
                             final byteData = ByteData.sublistView(buf);
                             byteData.set$data_type(0, value, $endian);
-                            return toRustBuffer(api, Uint8List.fromList(buf.toList()));
+                            return toRustBuffer(Uint8List.fromList(buf.toList()));
                         }
 
                         @override
@@ -217,7 +217,7 @@ macro_rules! impl_renderable_for_primitive {
                         @override
                         RustBuffer lower(String value) {
                             // FIXME: this is too many memcopies!
-                            return toRustBuffer(api, Utf8Encoder().convert(value));
+                            return toRustBuffer(Utf8Encoder().convert(value));
                         }
 
                         @override
@@ -516,8 +516,8 @@ pub fn generate_wrapper_lowerers() -> dart::Tokens {
             return uint8List;
         }
 
-        Uint8List lowerVaraibleLength<T>(T input, Uint8List Function(Api, T) lowerer) {
-            final lowered = lowerer(api, input);
+        Uint8List lowerVaraibleLength<T>(T input, Uint8List Function(T) lowerer) {
+            final lowered = lowerer(input);
             final length = createUint8ListFromInt(lowered.length);
             Uint8List res = Uint8List(lowered.length + length.length);
             res.setAll(0, length);
@@ -525,7 +525,7 @@ pub fn generate_wrapper_lowerers() -> dart::Tokens {
             return res;
         }
 
-        Uint8List lowerSequence<T, V>(List<T> input, Uint8List Function(Api, V) lowerer, int element_byte_size) {
+        Uint8List lowerSequence<T, V>(List<T> input, Uint8List Function(V) lowerer, int element_byte_size) {
           int capacity = input.length * element_byte_size;
           Uint8List items = Uint8List(capacity + 4); // Four bytes for the length
           int offset = 0;
@@ -536,7 +536,7 @@ pub fn generate_wrapper_lowerers() -> dart::Tokens {
 
           for (var i = 0; i < input.length; i++) {
             items.setRange(
-                offset, offset + element_byte_size, lowerer(api, input[i] as V));
+                offset, offset + element_byte_size, lowerer(input[i] as V));
             offset += element_byte_size;
           }
 

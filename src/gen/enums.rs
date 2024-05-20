@@ -74,7 +74,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                 }
 
                 static RustBuffer lower($cls_name input) {
-                    return toRustBuffer(api, createUint8ListFromInt(input.index + 1)); // So enums aren't zero indexed?
+                    return toRustBuffer(createUint8ListFromInt(input.index + 1)); // So enums aren't zero indexed?
                 }
             }
         }
@@ -88,7 +88,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                     // Pass lifting onto the appropriate variant. based on index...variants are not 0 index
                     $(for (index, variant) in obj.variants().iter().enumerate() =>
                         if (index == $(index+1)) {
-                            return $(variant.name())$cls_name.lift(api, buffer);
+                            return $(variant.name())$cls_name.lift(buffer);
                         }
                     )
                     // If no return happens
@@ -136,14 +136,14 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
     ) -> dart::Tokens {
         if let Type::Sequence { .. } = field.as_type() {
             return quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())(api, buffer, $offset_var));
+                $results_list.insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
                 $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($input_list);
             );
         }
 
         if Type::Boolean == field.as_type() {
             quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())( api, $input_list[$offset_var] ));
+                $results_list.insert($index, $(field.as_type().as_codetype().lift())( $input_list[$offset_var] ));
                 $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
             )
         } else if Type::String == field.as_type() {
@@ -153,7 +153,7 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
             )
         } else {
             quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())(api, buffer, $offset_var));
+                $results_list.insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
                 $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
             )
         }
@@ -178,7 +178,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
         _index: usize,
         offset_var: &dart::Tokens,
     ) -> dart::Tokens {
-        let lower_fn = quote!($(field.as_type().as_codetype().lower())(api, this.$(field.name())));
+        let lower_fn = quote!($(field.as_type().as_codetype().lower())(this.$(field.name())));
 
         quote! {
             final $(field.name()) = $(lower_fn);
@@ -219,7 +219,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
                 })
             )
 
-            return toRustBuffer(api, res);
+            return toRustBuffer(res);
         }
     }
 }

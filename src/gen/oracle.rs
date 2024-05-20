@@ -236,7 +236,7 @@ impl DartCodeOracle {
         match ty {
             Type::Object { .. } => inner,
             Type::String | Type::Optional { .. } | Type::Enum { .. } | Type::Sequence { .. } => {
-                quote!(toRustBuffer(api, $inner))
+                quote!(toRustBuffer($inner))
             }
             _ => inner,
         }
@@ -265,13 +265,13 @@ impl DartCodeOracle {
 
     // fn type_lift_optional_inner_type(inner_type: &Box<Type>, inner: dart::Tokens) -> dart::Tokens {
     //     match **inner_type {
-    //         Type::Int8 | Type::UInt8 => quote!(liftOptional(api, $inner, (api, v) => liftInt8OrUint8(v))),
-    //         Type::Int16 | Type::UInt16 => quote!(liftOptional(api, $inner, (api, v) => liftInt16OrUint16(v))),
-    //         Type::Int32 | Type::UInt32 => quote!(liftOptional(api, $inner, (api, v) => liftInt32OrUint32(v))),
-    //         Type::Int64 | Type::UInt64 => quote!(liftOptional(api, $inner, (api, v) => liftInt64OrUint64(v))),
-    //         Type::Float32 => quote!(liftOptional(api, $inner, (api, v) => liftFloat32(v))),
-    //         Type::Float64 => quote!(liftOptional(api, $inner, (api, v) => liftFloat64(v))),
-    //         Type::String => quote!(liftOptional(api, $inner, (api, v) => $(Self::type_lift_fn(inner_type, quote!(v.sublist(5))))) ),
+    //         Type::Int8 | Type::UInt8 => quote!(liftOptional($inner, (v) => liftInt8OrUint8(v))),
+    //         Type::Int16 | Type::UInt16 => quote!(liftOptional($inner, (v) => liftInt16OrUint16(v))),
+    //         Type::Int32 | Type::UInt32 => quote!(liftOptional($inner, (v) => liftInt32OrUint32(v))),
+    //         Type::Int64 | Type::UInt64 => quote!(liftOptional($inner, (v) => liftInt64OrUint64(v))),
+    //         Type::Float32 => quote!(liftOptional($inner, (v) => liftFloat32(v))),
+    //         Type::Float64 => quote!(liftOptional($inner, (v) => liftFloat64(v))),
+    //         Type::String => quote!(liftOptional($inner, (v) => $(Self::type_lift_fn(inner_type, quote!(v.sublist(5))))) ),
     //         _ => todo!("lift Option inner type: Type::{:?}", inner_type)
     //     }
     // }
@@ -294,7 +294,7 @@ impl DartCodeOracle {
             | Type::Enum { .. }
             | Type::Optional { .. }
             | Type::Sequence { .. } => quote!($(ty.as_codetype().lower())($inner)),
-            //      => quote!(lowerSequence(api, value, lowerUint8, 1)), // TODO: Write try lower primitives, then check what a sequence actually looks like and replicate it
+            //      => quote!(lowerSequence(value, lowerUint8, 1)), // TODO: Write try lower primitives, then check what a sequence actually looks like and replicate it
             _ => todo!("lower Type::{:?}", ty),
         }
     }

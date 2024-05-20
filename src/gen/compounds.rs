@@ -88,12 +88,12 @@ macro_rules! impl_renderable_for_compound {
                     let type_label = &format!($type_label_pattern, &inner_type_label);
 
                     let (lift_fn, lower_fn) = if cl_name.contains("Bool") {
-                        ("BoolFfiConverter().lift(api, intlist[5])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(api, value)])".to_string())
+                        ("BoolFfiConverter().lift(intlist[5])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(value)])".to_string())
                     } else if cl_name.contains("String") {
                         // Only pass the string data to the lifter
-                        (inner_codetype.lift() + "(api, buf, 5)" , self.inner().as_codetype().lower() + "(api, value).toIntList()")
+                        (inner_codetype.lift() + "(buf, 5)" , self.inner().as_codetype().lower() + "(value).toIntList()")
                     } else {
-                        (inner_codetype.lift() + "(api, buf, offset)" ,  self.inner().as_codetype().lower() + "(api, value).toIntList()")
+                        (inner_codetype.lift() + "(buf, offset)" ,  self.inner().as_codetype().lower() + "(value).toIntList()")
                     };
 
 
@@ -118,7 +118,7 @@ macro_rules! impl_renderable_for_compound {
                                 if (value == null) {
                                     final res = Uint8List(1);
                                     res.first = 0;
-                                    return toRustBuffer(api, res);
+                                    return toRustBuffer(res);
                                 }
                                 // converting the inner
                                 final inner = $lower_fn;
@@ -133,7 +133,7 @@ macro_rules! impl_renderable_for_compound {
                                 res.setAll(1, len.buffer.asUint8List().reversed);
                                 // then add the actual data
                                 res.setAll(offset, inner);
-                                return toRustBuffer(api, res);
+                                return toRustBuffer(res);
                             }
 
                             @override
@@ -178,12 +178,12 @@ macro_rules! impl_renderable_for_compound {
                     // TODO: Generate the proper lifter for each of the items
 
                     let (lift_fn, lower_fn) = if cl_name.contains("Bool") {
-                        ("BoolFfiConverter().lift(api, intlist[offset])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(api, value[i])])".to_string())
+                        ("BoolFfiConverter().lift(intlist[offset])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(value[i])])".to_string())
                     } else if cl_name.contains("String") {
                         // Only pass the string data to the lifter
-                        (inner_codetype.lift() + "(api, buf, offset + 5)" , self.inner().as_codetype().lower() + "(api, value[i]).toIntList()")
+                        (inner_codetype.lift() + "(buf, offset + 5)" , self.inner().as_codetype().lower() + "(value[i]).toIntList()")
                     } else {
-                        (inner_codetype.lift() + "(api, buf, offset)" ,  self.inner().as_codetype().lower() + "(api, value[i]).toIntList()")
+                        (inner_codetype.lift() + "(buf, offset)" ,  self.inner().as_codetype().lower() + "(value[i]).toIntList()")
                     };
                     let allocation_fn_expr = inner_cl_converter_name.to_owned() + "().size(item)";
 
@@ -220,7 +220,7 @@ macro_rules! impl_renderable_for_compound {
 
                                 Uint8List uint_list = Uint8List.fromList(items.expand((inner) => inner).toList());
 
-                                return toRustBuffer(api, uint_list);
+                                return toRustBuffer(uint_list);
                             }
 
                             @override
