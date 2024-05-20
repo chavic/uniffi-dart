@@ -284,12 +284,12 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             //     T lift(Api api, V value, [int offset]);
             //     V lower(Api api,T value);
             //     T read(ByteBuffer buf);
-            //     int allocationSize([T value]);
+            //     int size([T value]);
             //     void write(T value, ByteBuffer buf);
 
             //     RustBuffer lowerIntoRustBuffer(Api api, T value) {
             //       throw UnimplementedError("lower into rust implement lift from rust buffer");
-            //       // final rbuf = RustBuffer.allocate(api, allocationSize());
+            //       // final rbuf = RustBuffer.allocate(api, size());
             //       // try {
             //       //   final bbuf = rbuf.data.asByteBuffer(0, rbuf.capacity);
             //       //   write(value, bbuf);
@@ -394,7 +394,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             // }
 
 
-            // $(helpers_definitions)
+            $(helpers_definitions)
 
             $(types_definitions)
 

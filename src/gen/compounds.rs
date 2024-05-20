@@ -144,8 +144,8 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            int allocationSize([$type_label value]) {
-                                return $inner_cl_converter_name().allocationSize() + 4;
+                            int size([$type_label value]) {
+                                return $inner_cl_converter_name().size() + 4;
                             }
 
                             @override
@@ -185,7 +185,7 @@ macro_rules! impl_renderable_for_compound {
                     } else {
                         (inner_codetype.lift() + "(api, buf, offset)" ,  self.inner().as_codetype().lower() + "(api, value[i]).toIntList()")
                     };
-                    let allocation_fn_expr = inner_cl_converter_name.to_owned() + "().allocationSize(item)";
+                    let allocation_fn_expr = inner_cl_converter_name.to_owned() + "().size(item)";
 
 
 
@@ -231,9 +231,9 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            int allocationSize([$type_label? value]) {
+                            int size([$type_label? value]) {
                                 // TODO: Change allocation size to use the first 4 bits of the list given
-                                return ($inner_cl_converter_name().allocationSize() * value!.length) + 4;
+                                return ($inner_cl_converter_name().size() * value!.length) + 4;
                             }
 
                             @override

@@ -130,7 +130,7 @@ macro_rules! impl_renderable_for_primitive {
 
                         @override
                         RustBuffer lower(Api api, $type_signature value) {
-                            final buf = Uint8List(this.allocationSize());
+                            final buf = Uint8List(this.size());
                             final byteData = ByteData.sublistView(buf);
                             byteData.set$data_type(0, value, $endian);
                             return toRustBuffer(api, Uint8List.fromList(buf.toList()));
@@ -144,7 +144,7 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        int allocationSize([$type_signature value = $allocation_size]) {
+                        int size([$type_signature value = $allocation_size]) {
                           return $allocation_size;
                         }
 
@@ -185,7 +185,7 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        int allocationSize([bool value = false]) {
+                        int size([bool value = false]) {
                           return 1;
                         }
 
@@ -228,7 +228,7 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        int allocationSize([String value = ""]) {
+                        int size([String value = ""]) {
                             return value.length + 4; // Four additional bytes for the length data
                         }
 
@@ -273,7 +273,7 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        int allocationSize([T value]) {
+                        int size([T value]) {
                         //   return $allocation_size; // 1 = 8bits//TODO: Add correct allocation size for bytes, change the arugment type
                         }
 

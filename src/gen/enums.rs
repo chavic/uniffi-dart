@@ -137,24 +137,24 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
         if let Type::Sequence { .. } = field.as_type() {
             return quote!(
                 $results_list.insert($index, $(field.as_type().as_codetype().lift())(api, buffer, $offset_var));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize($input_list);
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($input_list);
             );
         }
 
         if Type::Boolean == field.as_type() {
             quote!(
                 $results_list.insert($index, $(field.as_type().as_codetype().lift())( api, $input_list[$offset_var] ));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize();
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
             )
         } else if Type::String == field.as_type() {
             quote!(
                 $results_list.insert($index, $(field.as_type().as_codetype().lift())(api,buffer, $offset_var+4));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize();
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
             )
         } else {
             quote!(
                 $results_list.insert($index, $(field.as_type().as_codetype().lift())(api, buffer, $offset_var));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize();
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
             )
         }
     }
@@ -182,7 +182,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
 
         quote! {
             final $(field.name()) = $(lower_fn);
-            $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize(this.$(field.name()));
+            $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
         }
     }
 
@@ -204,17 +204,17 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
                 $(match field.as_type() {
                     Type::Boolean =>
                         res.setAll(offset, Uint8List.fromList([$(field.name())]));
-                        offset += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize();
+                        offset += $(field.as_type().as_codetype().ffi_converter_name())().size();
                     ,
                     Type::String =>
                         res.setAll(offset, createUint8ListFromInt(this.$(field.name()).length));
                         offset += 4;
                         res.setAll(offset, Uint8List.fromList($(field.name()).toIntList()));
-                        offset += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize(this.$(field.name()));
+                        offset += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
                     ,
                     _ =>
                         res.setAll(offset, $(field.name()).toIntList());
-                        offset += $(field.as_type().as_codetype().ffi_converter_name())().allocationSize(this.$(field.name()));
+                        offset += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
                     ,
                 })
             )
