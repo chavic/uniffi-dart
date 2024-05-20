@@ -123,13 +123,13 @@ macro_rules! impl_renderable_for_primitive {
                 quote! {
                     class $cl_name extends FfiConverter<$type_signature, RustBuffer> {
                         @override
-                        $type_signature lift(Api api, RustBuffer buf, [int offset = 0]) {
+                        $type_signature lift(RustBuffer buf, [int offset = 0]) {
                             final uint_list = buf.toIntList();
                             return uint_list.buffer.asByteData().get$data_type(offset);
                         }
 
                         @override
-                        RustBuffer lower(Api api, $type_signature value) {
+                        RustBuffer lower($type_signature value) {
                             final buf = Uint8List(this.size());
                             final byteData = ByteData.sublistView(buf);
                             byteData.set$data_type(0, value, $endian);
@@ -168,12 +168,12 @@ macro_rules! impl_renderable_for_primitive {
                 quote! {
                     class BoolFfiConverter extends FfiConverter<bool, int> {
                         @override
-                        bool lift(Api api, int value, [int offset = 0]) {
+                        bool lift(int value, [int offset = 0]) {
                             return value == 1;
                         }
 
                         @override
-                        int lower(Api api, bool value) {
+                        int lower(bool value) {
                             return value ? 1 : 0;
                         }
 
@@ -209,13 +209,13 @@ macro_rules! impl_renderable_for_primitive {
                     // }
                     class FfiConverterString extends FfiConverter<String, RustBuffer> {
                         @override
-                        String lift(Api api, RustBuffer buf, [int offset = 0]) {
+                        String lift(RustBuffer buf, [int offset = 0]) {
                             final uint_list = buf.toIntList().sublist(offset);
                             return utf8.decoder.convert(uint_list);
                         }
 
                         @override
-                        RustBuffer lower(Api api, String value) {
+                        RustBuffer lower(String value) {
                             // FIXME: this is too many memcopies!
                             return toRustBuffer(api, Utf8Encoder().convert(value));
                         }
@@ -252,13 +252,13 @@ macro_rules! impl_renderable_for_primitive {
                 quote! {
                     class BytesFfiConverter extends FfiConverter<$canonical_name, RustBuffer> {
                         @override
-                        int lift(Api api, RustBuffer buf, [int offset = 0]) {
+                        int lift(RustBuffer buf, [int offset = 0]) {
                             // final uint_list = buf.toIntList();
                             // return uint_list.buffer.asByteData().get$canonical_name(1);
                         }
 
                         @override
-                        RustBuffer lower(Api api, int value) {
+                        RustBuffer lower(int value) {
                             // final uint_list = Uint8List.fromList([value ? 1 : 0]);
                             // final byteData = ByteData.sublistView(buf);
                             // byteData.setInt16(0, value, Endian.little);
@@ -411,7 +411,7 @@ pub fn generate_wrapper_lifters() -> dart::Tokens {
             return DataOffset(liftedData, length);
         }
 
-        List<T> liftSequence<T>(Api api, Uint8List buf, Function(Uint8List, [int offset]) lifter, [int element_byte_size = 1,int offset = 0]) {
+        List<T> liftSequence<T>(Uint8List buf, Function(Uint8List, [int offset]) lifter, [int element_byte_size = 1,int offset = 0]) {
             List<T> res = [];
             buf = buf.sublist(offset);
             final length = buf.buffer.asByteData().getInt32(0);
@@ -452,7 +452,7 @@ pub fn generate_wrapper_lifters() -> dart::Tokens {
 //             return uint8List;
 //         }
 
-//         Uint8List lowerUint8(Api api, int value) {
+//         Uint8List lowerUint8(int value) {
 //             final buf = Uint8List(1);
 //             final byteData = ByteData.sublistView(buf);
 //             byteData.setUint8(0, value);
@@ -516,7 +516,7 @@ pub fn generate_wrapper_lowerers() -> dart::Tokens {
             return uint8List;
         }
 
-        Uint8List lowerVaraibleLength<T>(Api api, T input, Uint8List Function(Api, T) lowerer) {
+        Uint8List lowerVaraibleLength<T>(T input, Uint8List Function(Api, T) lowerer) {
             final lowered = lowerer(api, input);
             final length = createUint8ListFromInt(lowered.length);
             Uint8List res = Uint8List(lowered.length + length.length);
@@ -525,7 +525,7 @@ pub fn generate_wrapper_lowerers() -> dart::Tokens {
             return res;
         }
 
-        Uint8List lowerSequence<T, V>(Api api, List<T> input, Uint8List Function(Api, V) lowerer, int element_byte_size) {
+        Uint8List lowerSequence<T, V>(List<T> input, Uint8List Function(Api, V) lowerer, int element_byte_size) {
           int capacity = input.length * element_byte_size;
           Uint8List items = Uint8List(capacity + 4); // Four bytes for the length
           int offset = 0;

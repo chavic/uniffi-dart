@@ -105,7 +105,7 @@ macro_rules! impl_renderable_for_compound {
                     quote! {
                         class $cl_name extends FfiConverter<$type_label, RustBuffer> {
                             @override
-                            $type_label lift(Api api, RustBuffer buf, [int offset = 1]) {
+                            $type_label lift(RustBuffer buf, [int offset = 1]) {
                                 var intlist = buf.toIntList();
                                 if (intlist.isEmpty || intlist.first == 0){
                                     return null;
@@ -114,7 +114,7 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            RustBuffer lower(Api api, $type_label value) {
+                            RustBuffer lower($type_label value) {
                                 if (value == null) {
                                     final res = Uint8List(1);
                                     res.first = 0;
@@ -192,7 +192,7 @@ macro_rules! impl_renderable_for_compound {
                     quote! {
                         class $cl_name extends FfiConverter<$type_label, RustBuffer> {
                             @override
-                            $type_label lift(Api api, RustBuffer buf, [int offset = 0]) {
+                            $type_label lift(RustBuffer buf, [int offset = 0]) {
                                 $type_label res = [];
                                 var intlist = buf.toIntList();
                                 final length = intlist.buffer.asByteData().getInt32(offset);
@@ -210,7 +210,7 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            RustBuffer lower(Api api, $type_label value) {
+                            RustBuffer lower($type_label value) {
                                 List<Uint8List> items = [createUint8ListFromInt(value.length)];
 
                                 for (var i = 0; i < value.length; i++) {

@@ -63,7 +63,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             enum $cls_name {
                 $(for variant in obj.variants() => $(enum_variant_name(variant.name())),);
 
-                factory $cls_name.lift(Api api, RustBuffer buffer) {
+                factory $cls_name.lift(RustBuffer buffer) {
                     final index = buffer.toIntList().buffer.asByteData().getInt32(0);
                     $(for (index, variant) in obj.variants().iter().enumerate() =>
                         if (index == $(index+1)) {
@@ -73,7 +73,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                     throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, "Unable to determine enum variant");
                 }
 
-                static RustBuffer lower(Api api, $cls_name input) {
+                static RustBuffer lower($cls_name input) {
                     return toRustBuffer(api, createUint8ListFromInt(input.index + 1)); // So enums aren't zero indexed?
                 }
             }
@@ -83,7 +83,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             abstract class $cls_name {
                 $cls_name();
 
-                factory $cls_name.lift(Api api, RustBuffer buffer) {
+                factory $cls_name.lift(RustBuffer buffer) {
                     final index = buffer.toIntList().buffer.asByteData().getInt32(0);
                     // Pass lifting onto the appropriate variant. based on index...variants are not 0 index
                     $(for (index, variant) in obj.variants().iter().enumerate() =>
@@ -97,7 +97,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                     // //return $cls_name(7);
                 }
 
-                static RustBuffer lower(Api api, Value value) {
+                static RustBuffer lower(Value value) {
                     // Each variant has a lower method, simply pass on it's return
                     $(for (_index, variant) in obj.variants().iter().enumerate() =>
                         if (value is $(variant.name())$cls_name) {
@@ -160,7 +160,7 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
     }
 
     quote! {
-        factory $(class_name(variant.name()))$cls_name.lift(Api api, RustBuffer buffer) {
+        factory $(class_name(variant.name()))$cls_name.lift(RustBuffer buffer) {
             Uint8List input = buffer.toIntList();
             int offset = 4; // Start at 4, because the first 32bits are the enum index
             List<dynamic> results = [];

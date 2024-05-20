@@ -12,7 +12,7 @@ pub fn generate_record(obj: &Record) -> dart::Tokens {
 
             $(cls_name)._($(for f in obj.fields() => this.$(var_name(f.name())), ));
 
-            // factory $(cls_name).lift(Api api, Pointer<Void> ptr) {
+            // factory $(cls_name).lift(Pointer<Void> ptr) {
             //     return $(cls_name)._(api, ptr);
             // }
 
