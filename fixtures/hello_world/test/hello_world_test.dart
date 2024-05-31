@@ -2,22 +2,21 @@ import 'package:test/test.dart';
 import '../hello_world.dart';
 
 void main() {
-  final api = Api.load();
   test('hello world', () {
-    expect(api.helloWorld(), "hello world");
+    expect(helloWorld(), "hello world");
   });
 
   test('hello mikka', () {
-    expect(api.hello("mikka"), "hello mikka");
+    expect(hello("mikka"), "hello mikka");
   });
 
   test("object test", () {
-    final world = api.newWorld();
+    final world = newWorld();
     expect(world.isThere(), true);
   });
 
   test("stringed world test", () {
-    var world = api.newWorldWithName("sari");
+    var world = newWorldWithName("sari");
     expect(world.name(), "sari");
     expect(world.prefixedName("mister"), "mister sari");
     expect(world.prefixedName(null), null);

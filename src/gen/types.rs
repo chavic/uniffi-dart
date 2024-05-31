@@ -394,8 +394,6 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             // }
 
 
-            $(helpers_definitions)
-
             $(types_definitions)
 
 
@@ -475,6 +473,10 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                     return rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_alloc().name())(size, status));
                 }
 
+                static RustBuffer fromBytes(ForeignBytes bytes) {
+                    return rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_from_bytes().name())(bytes, status));
+                }
+
                 // static RustBuffer from(Pointer<Uint8> bytes, int len) {
                 //   final foreignBytes = ForeignBytes(len: len, data: bytes);
                 //   return rustCall((status) => _UniffiLib.instance.ffi_uniffi_futures_rustbuffer_from_bytes(foreignBytes));
@@ -498,6 +500,28 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 String toString() {
                 return "RustBuffer{capacity: $capacity, len: $len, data: $data}";
                 }
+
+                Uint8List toIntList() {
+                    final buf = Uint8List(len);
+                    final precast = data.cast<Uint8>();
+                    for (int i = 0; i < len; i++) {
+                        buf[i] = precast.elementAt(i).value;
+                    }
+                    return buf;
+                }
+            }
+
+            RustBuffer toRustBuffer(Uint8List data) {
+                final length = data.length;
+
+                final Pointer<Uint8> frameData = calloc<Uint8>(length); // Allocate a pointer large enough.
+                final pointerList = frameData.asTypedList(length); // Create a list that uses our pointer and copy in the data.
+                pointerList.setAll(0, data); // FIXME: can we remove this memcopy somehow?
+
+                final bytes = calloc<ForeignBytes>();
+                bytes.ref.len = length;
+                bytes.ref.data = frameData;
+                return RustBuffer.fromBytes(bytes.ref);
             }
 
             class ForeignBytes extends Struct {
@@ -537,63 +561,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 T lower(T value) => value;
             }
 
-            class FfiConverterBool implements FfiConverter<bool, int> {
-                const FfiConverterBool();
-
-                @override
-                bool lift(int value) => value != 0;
-
-                @override
-                int lower(bool value) => value ? 1 : 0;
-
-                @override
-                bool read(ByteData buffer, int offset) => buffer.getInt8(offset) != 0;
-
-                @override
-                void write(bool value, ByteData buffer, int offset) {
-                buffer.setInt8(offset, lower(value));
-                }
-
-                @override
-                int size(value) => 1;
-            }
-
-            class FfiConverterString implements FfiConverter<String, RustBuffer> {
-                const FfiConverterString();
-                // TODO: Figure out why there's spooky behavior here, default should be four, will fix later
-                String lift(RustBuffer value, [int offset = 11]) {
-                try {
-                    final data = value.asTypedList().buffer.asUint8List(offset);
-                    return utf8.decode(data);
-                } finally {
-                    value.free();
-                }
-                }
-
-                @override
-                RustBuffer lower(String value) {
-                final buffer = RustBuffer.alloc(size(value));
-                write(value, buffer.data.cast<Uint8>().asTypedList(size(value)).buffer.asByteData(), 0);
-                return buffer;
-                }
-
-                @override
-                String read(ByteData buffer, int offset) {
-                final length = buffer.getInt32(offset);
-                final stringBytes = buffer.buffer.asUint8List(offset + 4, length);
-                return utf8.decode(stringBytes);
-                }
-
-                @override
-                void write(String value, ByteData buffer, int offset) {
-                final stringBytes = utf8.encode(value);
-                buffer.setInt32(offset, stringBytes.length);
-                buffer.buffer.asUint8List(offset + 4).setAll(0, stringBytes);
-                }
-
-                @override
-                int size(value) => 4 + utf8.encode(value).length;
-            }
+            $(helpers_definitions)
 
             const int UNIFFI_RUST_FUTURE_POLL_READY = 0;
             const int UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;

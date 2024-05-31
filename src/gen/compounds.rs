@@ -50,7 +50,7 @@ macro_rules! impl_code_type_for_compound {
                 }
 
                 fn ffi_converter_name(&self) -> String {
-                    format!("{}FfiConverter", self.canonical_name())
+                    format!("FfiConverter{}", self.canonical_name())
                 }
 
                 fn lower(&self) -> String {
@@ -80,12 +80,14 @@ macro_rules! impl_renderable_for_compound {
                 fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
                     type_helper.include_once_check($canonical_name_pattern, &self.self_type);
                     let inner_codetype = DartCodeOracle::find(self.inner());
-                    let inner_type_label = inner_codetype.type_label();
+                    // let inner_type_label = inner_codetype.type_label();
 
                     type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
 
-                    let cl_name = format!($canonical_name_pattern, inner_codetype.canonical_name()) + "FfiConverter";
-                    let type_label = &format!($type_label_pattern, &inner_type_label);
+                    // let cl_name = format!($canonical_name_pattern, inner_codetype.canonical_name()) + "FfiConverter";
+                    let cl_name = self.ffi_converter_name();
+                    // let type_label = &format!($type_label_pattern, &inner_type_label);
+                    let type_label = &self.type_label();
 
                     let (lift_fn, lower_fn) = if cl_name.contains("Bool") {
                         ("BoolFfiConverter().lift(intlist[5])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(value)])".to_string())
@@ -137,7 +139,7 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            $type_label read(ByteBuffer buf) {
+                            $type_label read(ByteData buf, int offset) {
                                 // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
                                 // considerations, after research on performance implications
                                 throw UnimplementedError("Should probably implement read now");
@@ -145,11 +147,11 @@ macro_rules! impl_renderable_for_compound {
 
                             @override
                             int size([$type_label value]) {
-                                return $inner_cl_converter_name().size() + 4;
+                                return $inner_cl_converter_name().size(value!) + 4;
                             }
 
                             @override
-                            void write($type_label value, ByteBuffer buf) {
+                            void write($type_label value, ByteData buffer, int offset) {
                                 throw UnimplementedError("Should probably implement writes now");
                             }
                         }
@@ -224,7 +226,7 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            $type_label read(ByteBuffer buf) {
+                            $type_label read(ByteData buf, int offset) {
                                 // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
                                 // considerations, after research on performance implications
                                 throw UnimplementedError("Should probably implement read now");
@@ -237,7 +239,7 @@ macro_rules! impl_renderable_for_compound {
                             }
 
                             @override
-                            void write($type_label value, ByteBuffer buf) {
+                            void write($type_label value, ByteData buffer, int offset) {
                                 throw UnimplementedError("Should probably implement writes now");
                             }
                         }

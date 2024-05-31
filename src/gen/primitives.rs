@@ -166,33 +166,25 @@ macro_rules! impl_renderable_for_primitive {
                 // }
                 // This method can be expanded to generate type helper methods if needed.
                 quote! {
-                    class BoolFfiConverter extends FfiConverter<bool, int> {
+                    class FfiConverterBool implements FfiConverter<bool, int> {
+                        const FfiConverterBool();
+        
                         @override
-                        bool lift(int value, [int offset = 0]) {
-                            return value == 1;
-                        }
-
+                        bool lift(int value) => value != 0;
+        
                         @override
-                        int lower(bool value) {
-                            return value ? 1 : 0;
-                        }
-
+                        int lower(bool value) => value ? 1 : 0;
+        
                         @override
-                        bool read(ByteBuffer buf) {
-                            // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
-                            // performance reasons
-                          throw UnimplementedError("Should probably implement read now");
-                        }
-
+                        bool read(ByteData buffer, int offset) => buffer.getInt8(offset) != 0;
+        
                         @override
-                        int size([bool value = false]) {
-                          return 1;
+                        void write(bool value, ByteData buffer, int offset) {
+                        buffer.setInt8(offset, lower(value));
                         }
-
+        
                         @override
-                        void write(bool value, ByteBuffer buf) {
-                            throw UnimplementedError("Should probably implement read now");
-                        }
+                        int size(value) => 1;
                     }
                 }
             }
@@ -207,35 +199,41 @@ macro_rules! impl_renderable_for_primitive {
                     // if (type_helper.check($canonical_name)) {
                     //     return quote!()
                     // }
-                    class FfiConverterString extends FfiConverter<String, RustBuffer> {
-                        @override
-                        String lift(RustBuffer buf, [int offset = 0]) {
-                            final uint_list = buf.toIntList().sublist(offset);
-                            return utf8.decoder.convert(uint_list);
+                    class FfiConverterString implements FfiConverter<String, RustBuffer> {
+                        const FfiConverterString();
+                        // TODO: Figure out why there's spooky behavior here, default should be four, will fix later
+                        String lift(RustBuffer value, [int offset = 0]) {
+                            try {
+                                final data = value.asTypedList().buffer.asUint8List(offset);
+                                return utf8.decoder.convert(data);
+                            } finally {
+                                value.free();
+                            }
                         }
-
+        
                         @override
                         RustBuffer lower(String value) {
-                            // FIXME: this is too many memcopies!
-                            return toRustBuffer(Utf8Encoder().convert(value));
+                            final buffer = toRustBuffer(Utf8Encoder().convert(value)); // TODO: Fix the meme copies issue by first fixing read
+                            return buffer;
                         }
-
+        
                         @override
-                        String read(ByteBuffer buf) {
-                            // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
-                            // performance reasons
-                          throw UnimplementedError("Should probably implement read now");
+                        String read(ByteData buffer, int offset) {
+                            // TODO! : Fix this, it shouldn't append the lenth to every string, please remove first four bytes later
+                            final length = buffer.getInt32(offset);
+                            final stringBytes = buffer.buffer.asUint8List(offset + 4, length);
+                            return utf8.decoder.convert(stringBytes);
                         }
-
+        
                         @override
-                        int size([String value = ""]) {
-                            return value.length + 4; // Four additional bytes for the length data
+                        void write(String value, ByteData buffer, int offset) {
+                        final stringBytes = utf8.encode(value);
+                        buffer.setInt32(offset, stringBytes.length);
+                        buffer.buffer.asUint8List(offset + 4).setAll(0, stringBytes);
                         }
-
+        
                         @override
-                        void write(String value, ByteBuffer buf) {
-                            throw UnimplementedError("Should probably implement read now");
-                        }
+                        int size(value) => 4 + utf8.encode(value).length;
                     }
                 }
             }
