@@ -123,25 +123,19 @@ macro_rules! impl_renderable_for_primitive {
                 quote! {
                     class $cl_name extends FfiConverter<$type_signature, RustBuffer> {
                         @override
-                        $type_signature lift(RustBuffer buf, [int offset = 0]) {
-                            final uint_list = buf.toIntList();
-                            return uint_list.buffer.asByteData().get$data_type(offset);
-                        }
+                        $type_signature lift(RustBuffer buf, [int offset = 0]) =>
+                        read(buf.toIntList().buffer.asByteData(), offset);
 
                         @override
-                        RustBuffer lower($type_signature value) {
+                        RustBuffer lower(int value) {
                             final buf = Uint8List(this.size());
                             final byteData = ByteData.sublistView(buf);
-                            byteData.set$data_type(0, value, $endian);
+                            write(value, byteData, 0);
                             return toRustBuffer(Uint8List.fromList(buf.toList()));
-                        }
+                          }
 
                         @override
-                        $type_signature read(ByteBuffer buf) {
-                            // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
-                            // considerations, after research on performance implications
-                          throw UnimplementedError("Should probably implement read now");
-                        }
+                        $type_signature read(ByteData buffer, int offset) => buffer.get$data_type(offset);
 
                         @override
                         int size([$type_signature value = $allocation_size]) {
@@ -149,9 +143,8 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        void write($type_signature value, ByteBuffer buf) {
-                            throw UnimplementedError("Should probably implement writes now");
-                        }
+                        void write(int value, ByteData buffer, int offset) =>
+                        buffer.set$data_type(offset, value);
                     }
                 }
             }

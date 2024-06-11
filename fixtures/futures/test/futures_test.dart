@@ -14,7 +14,7 @@ void main() {
 
   test('greet', () async {
     final result = await greet("Somebody");
-    expect(result, "Somebody");
+    expect(result, "Hello, Somebody");
   });
 
   test('always_ready', () async {
