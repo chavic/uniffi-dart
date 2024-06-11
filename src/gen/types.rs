@@ -3,7 +3,7 @@ use std::{
     collections::{BTreeSet, HashMap},
 };
 
-use super::{enums, functions, objects, primitives, records};
+use super::{enums, functions, objects, oracle::AsCodeType, primitives, records};
 use super::{
     render::{AsRenderable, Renderer, TypeHelperRenderer},
     Config,
@@ -117,13 +117,15 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
         // let function_definitions = quote!($( for fun in self.ci.function_definitions() => $(functions::generate_function("this", fun, self))));
 
-        let helpers_definitions = quote! {
-            $(for (_, ty) in self.get_include_names().iter() => $(ty.as_renderable().render_type_helper(self)) )
-        };
-
         let function_definitions = quote!(
             $(for fun in self.ci.function_definitions() => $(functions::generate_function(fun, self)))
         );
+
+        // Let's include the string converter
+        self.include_once_check(&Type::String.as_codetype().canonical_name(), &Type::String);
+        let helpers_definitions = quote! {
+            $(for (_, ty) in self.get_include_names().iter() => $(ty.as_renderable().render_type_helper(self)) )
+        };
 
         let types_helper_code = quote! {
             import "dart:async";
