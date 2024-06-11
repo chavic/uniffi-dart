@@ -199,14 +199,14 @@ impl<'a> DartWrapper<'a> {
                     final bindingsVersion = $(self.ci.uniffi_contract_version());
                     final scaffoldingVersion = _UniffiLib.instance.$(self.ci.ffi_uniffi_contract_version().name())();
                     if (bindingsVersion != scaffoldingVersion) {
-                      throw UniffiInternalError("UniFFI contract version mismatch: bindings version $bindingsVersion, scaffolding version $scaffoldingVersion");
+                      throw UniffiInternalError.panicked("UniFFI contract version mismatch: bindings version $bindingsVersion, scaffolding version $scaffoldingVersion");
                     }
                 }
 
                 static void _checkApiChecksums() {
                     $(for (name, expected_checksum) in self.ci.iter_checksums() =>
                         if (_UniffiLib.instance.$(name)() != $expected_checksum) {
-                          throw UniffiInternalError("UniFFI API checksum mismatch");
+                          throw UniffiInternalError.panicked("UniFFI API checksum mismatch");
                         }
                     )
                 }

@@ -399,16 +399,51 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             $(types_definitions)
 
 
-
-            // New Helper classes and functions
-
             class UniffiInternalError implements Exception {
-                final String message;
+                static const int bufferOverflow = 0;
+                static const int incompleteData = 1;
+                static const int unexpectedOptionalTag = 2;
+                static const int unexpectedEnumCase = 3;
+                static const int unexpectedNullPointer = 4;
+                static const int unexpectedRustCallStatusCode = 5;
+                static const int unexpectedRustCallError = 6;
+                static const int unexpectedStaleHandle = 7;
+                static const int rustPanic = 8;
 
-                UniffiInternalError(this.message);
+                final int errorCode;
+                final String? panicMessage;
+
+                const UniffiInternalError(this.errorCode, this.panicMessage);
+
+                static UniffiInternalError panicked(String message) {
+                return UniffiInternalError(rustPanic, message);
+                }
 
                 @override
-                String toString() => "UniffiInternalError: $message";
+                String toString() {
+                switch (errorCode) {
+                    case bufferOverflow:
+                    return "UniFfi::BufferOverflow";
+                    case incompleteData:
+                    return "UniFfi::IncompleteData";
+                    case unexpectedOptionalTag:
+                    return "UniFfi::UnexpectedOptionalTag";
+                    case unexpectedEnumCase:
+                    return "UniFfi::UnexpectedEnumCase";
+                    case unexpectedNullPointer:
+                    return "UniFfi::UnexpectedNullPointer";
+                    case unexpectedRustCallStatusCode:
+                    return "UniFfi::UnexpectedRustCallStatusCode";
+                    case unexpectedRustCallError:
+                    return "UniFfi::UnexpectedRustCallError";
+                    case unexpectedStaleHandle:
+                    return "UniFfi::UnexpectedStaleHandle";
+                    case rustPanic:
+                    return "UniFfi::rustPanic: $$panicMessage";
+                    default:
+                    return "UniFfi::UnknownError: $$errorCode";
+                }
+                }
             }
 
             const int CALL_SUCCESS = 0;
@@ -432,12 +467,12 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 throw errorHandler.lift(status.errorBuf);
                 } else if (status.code == CALL_UNEXPECTED_ERROR) {
                 if (status.errorBuf.len > 0) {
-                    throw UniffiInternalError(FfiConverterString().lift(status.errorBuf));
+                    throw UniffiInternalError.panicked(FfiConverterString().lift(status.errorBuf));
                 } else {
-                    throw UniffiInternalError("Rust panic");
+                    throw UniffiInternalError.panicked("Rust panic");
                 }
                 } else {
-                throw UniffiInternalError("Unexpected RustCallStatus code: ${status.code}");
+                throw UniffiInternalError.panicked("Unexpected RustCallStatus code: ${status.code}");
                 }
             }
 
@@ -454,7 +489,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 @override
                 Exception lift(RustBuffer errorBuf) {
                 errorBuf.free();
-                return UniffiInternalError("Unexpected CALL_ERROR");
+                return UniffiInternalError.panicked("Unexpected CALL_ERROR");
                 }
             }
 
@@ -561,6 +596,24 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
                 @override
                 T lower(T value) => value;
+            }
+
+            Uint8List createUint8ListFromInt(int value) {
+                int length = value.bitLength ~/ 8 + 1;
+
+                // Ensure the length is either 4 or 8
+                if (length != 4 && length != 8) {
+                length = (value < 0x100000000) ? 4 : 8;
+                }
+
+                Uint8List uint8List = Uint8List(length);
+
+                for (int i = length - 1; i >= 0; i--) {
+                uint8List[i] = value & 0xFF;
+                value >>= 8;
+                }
+
+                return uint8List;
             }
 
             $(helpers_definitions)
