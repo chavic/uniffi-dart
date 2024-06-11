@@ -171,7 +171,7 @@ macro_rules! impl_renderable_for_compound {
 
                     type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
 
-                    let cl_name = format!($canonical_name_pattern, inner_codetype.canonical_name()) + "FfiConverter";
+                    let cl_name = format!("{}{}","FfiConverter",  format!($canonical_name_pattern, inner_codetype.canonical_name()));
                     let type_label = &format!("List<{}>", &inner_type_label);
 
                     let inner_cl_converter_name = &self.inner().as_codetype().ffi_converter_name();
