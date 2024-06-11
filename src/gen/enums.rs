@@ -69,8 +69,8 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                         if (index == $(index+1)) {
                             return $cls_name.$(enum_variant_name(variant.name()));
                         }
-                    )
-                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, "Unable to determine enum variant");
+                    ) 
+                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, null);
                 }
 
                 static RustBuffer lower($cls_name input) {
@@ -92,7 +92,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                         }
                     )
                     // If no return happens
-                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, "Unable to determine enum variant");
+                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, null);
                     // return $(class_name(obj.variants()[6].name()))Value(6);
                     // //return $cls_name(7);
                 }
@@ -101,10 +101,10 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                     // Each variant has a lower method, simply pass on it's return
                     $(for (_index, variant) in obj.variants().iter().enumerate() =>
                         if (value is $(variant.name())$cls_name) {
-                            return value.lower(api);
+                            return value.lower();
                         }
                     )
-                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, "Unable to determine enum variant to lower");
+                    throw UniffiInternalError(UniffiInternalError.unexpectedEnumCase, null);
                 }
             }
 
@@ -136,25 +136,25 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
     ) -> dart::Tokens {
         if let Type::Sequence { .. } = field.as_type() {
             return quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
+                $(&results_list).insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
                 $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($input_list);
             );
         }
 
         if Type::Boolean == field.as_type() {
             quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())( $input_list[$offset_var] ));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
+                $(&results_list).insert($index, $(field.as_type().as_codetype().lift())( $input_list[$offset_var] ));
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($results_list[$index]);
             )
         } else if Type::String == field.as_type() {
             quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())(api,buffer, $offset_var+4));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
+                $(&results_list).insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var+4));
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($results_list[$index]);
             )
         } else {
             quote!(
-                $results_list.insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
-                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size();
+                $(&results_list).insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
+                $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($results_list[$index]);
             )
         }
     }
@@ -187,7 +187,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
     }
 
     quote! {
-        RustBuffer lower(Api api) {
+        RustBuffer lower() {
             // Turn all the fields to their int lists representations
             final index = createUint8ListFromInt($(index + 1));
             int offset = 0;
@@ -204,7 +204,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
                 $(match field.as_type() {
                     Type::Boolean =>
                         res.setAll(offset, Uint8List.fromList([$(field.name())]));
-                        offset += $(field.as_type().as_codetype().ffi_converter_name())().size();
+                        offset += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
                     ,
                     Type::String =>
                         res.setAll(offset, createUint8ListFromInt(this.$(field.name()).length));

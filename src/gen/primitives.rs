@@ -109,7 +109,7 @@ macro_rules! impl_renderable_for_primitive {
                     String::from($canonical_name) + "List.fromList(buf.toList())"
                 });
 
-                let cl_name = String::from($canonical_name) + "FfiConverter";
+                let cl_name =  format!("FfiConverter{}", $canonical_name);
                 let data_type = &$canonical_name
                     .replace("UInt", "Uint")
                     .replace("Double", "Float");
@@ -127,7 +127,7 @@ macro_rules! impl_renderable_for_primitive {
                         read(buf.toIntList().buffer.asByteData(), offset);
 
                         @override
-                        RustBuffer lower(int value) {
+                        RustBuffer lower($type_signature value) {
                             final buf = Uint8List(this.size());
                             final byteData = ByteData.sublistView(buf);
                             write(value, byteData, 0);
@@ -143,7 +143,7 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         @override
-                        void write(int value, ByteData buffer, int offset) =>
+                        void write($type_signature value, ByteData buffer, int offset) =>
                         buffer.set$data_type(offset, value);
                     }
                 }
