@@ -262,7 +262,7 @@ macro_rules! impl_renderable_for_compound {
 
                                 Uint8List uint_list = Uint8List.fromList(items.expand((inner) => inner).toList());
 
-                                buf.buffer.asInt8List().setAll(0, uint_list);
+                                buf.buffer.asInt8List().setAll(offset, uint_list);
                             }
                         }
                     }
