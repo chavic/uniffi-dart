@@ -121,19 +121,8 @@ macro_rules! impl_renderable_for_primitive {
                 };
 
                 quote! {
-                    class $cl_name extends FfiConverter<$type_signature, RustBuffer> {
-                        @override
-                        $type_signature lift(RustBuffer buf, [int offset = 0]) =>
-                        read(buf.toIntList().buffer.asByteData(), offset);
-
-                        @override
-                        RustBuffer lower($type_signature value) {
-                            final buf = Uint8List(this.size());
-                            final byteData = ByteData.sublistView(buf);
-                            write(value, byteData, 0);
-                            return toRustBuffer(Uint8List.fromList(buf.toList()));
-                          }
-
+                    class $cl_name extends FfiConverter<$type_signature, $type_signature> 
+                    with FfiConverterPrimitive<$type_signature> {
                         @override
                         $type_signature read(ByteData buffer, int offset) => buffer.get$data_type(offset);
 
