@@ -153,7 +153,7 @@ fn generate_variant_factory(cls_name: &String, variant: &Variant) -> dart::Token
             )
         } else {
             quote!(
-                $(&results_list).insert($index, $(field.as_type().as_codetype().lift())(buffer, $offset_var));
+                $(&results_list).insert($index, $(field.as_type().as_codetype().read())(buffer.asTypedList().buffer.asByteData(), $offset_var));
                 $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size($results_list[$index]);
             )
         }
@@ -179,7 +179,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
         offset_var: &dart::Tokens,
     ) -> dart::Tokens {
         let lower_fn = quote!($(field.as_type().as_codetype().lower())(this.$(field.name())));
-
+        // TODO: Use the write funtions instad
         quote! {
             final $(field.name()) = $(lower_fn);
             $offset_var += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
@@ -195,6 +195,7 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
             $(for (index, field) in variant.fields().iter().enumerate() => $(generate_variant_field_lower(field, index, &quote!(offset))))
             // Create a list with big enough for all the fields and reset the offset
             final res = Uint8List(offset);
+            // Let's reset the offset for writing
             offset = 0;
             // First set the index
             res.setAll(offset, index);
@@ -209,11 +210,12 @@ fn generate_variant_lowerer(_cls_name: &str, index: usize, variant: &Variant) ->
                     Type::String =>
                         res.setAll(offset, createUint8ListFromInt(this.$(field.name()).length));
                         offset += 4;
+
                         res.setAll(offset, Uint8List.fromList($(field.name()).toIntList()));
                         offset += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
                     ,
                     _ =>
-                        res.setAll(offset, $(field.name()).toIntList());
+                        $(field.as_type().as_codetype().ffi_converter_name())().write(this.$(field.name()), res.buffer.asByteData(), offset);
                         offset += $(field.as_type().as_codetype().ffi_converter_name())().size(this.$(field.name()));
                     ,
                 })
