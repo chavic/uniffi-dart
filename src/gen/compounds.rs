@@ -219,11 +219,6 @@ macro_rules! impl_renderable_for_compound {
                                 List<Uint8List> items = [createUint8ListFromInt(value.length)];
 
                                 for (var i = 0; i < value.length; i++) {
-                                    // int item = FfiConverterInt32().lower(value[i]);
-                                    // int item_size = FfiConverterInt32().size(item);
-                                    // Uint8List item_intlist = Uint8List(item_size);
-                                    // FfiConverterInt32().write(item, item_intlist.buffer.asByteData(), 0);
-                                    // items.add(item_intlist);
                                     $inner_type_label item = $lower_fn;
                                     int item_size = $allocation_fn_expr;
                                     Uint8List item_intlist = Uint8List(item_size);
