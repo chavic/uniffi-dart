@@ -3,7 +3,8 @@ use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 
 use uniffi_bindgen::backend::CodeType;
-use uniffi_bindgen::interface::{AsType, FfiType, Type};
+use uniffi_bindgen::interface::{AsType, Callable, ExternalKind, FfiType, Type};
+use uniffi_bindgen::ComponentInterface;
 
 use crate::gen::primitives;
 
@@ -26,6 +27,7 @@ impl DartCodeOracle {
         panic!("unsupported type for error: {type_:?}")
     }
 
+  
     /// Sanitize a Dart identifier, appending an underscore if it's a reserved keyword.
     pub fn sanitize_identifier(id: &str) -> String {
         if Self::is_reserved_identifier(id) {
@@ -52,7 +54,6 @@ impl DartCodeOracle {
     }
 
     /// Get the idiomatic Dart rendering of a variable name.
-
     pub fn var_name(nm: &str) -> String {
         Self::sanitize_identifier(&nm.to_lower_camel_case())
     }
@@ -60,6 +61,11 @@ impl DartCodeOracle {
     /// Get the idiomatic Dart rendering of an individual enum variant.
     pub fn enum_variant_name(nm: &str) -> String {
         Self::sanitize_identifier(&nm.to_lower_camel_case())
+    }
+
+    /// Get the idiomatic Dart rendering of an FFI callback function name
+    fn ffi_callback_name(nm: &str) -> String {
+        format!("Pointer<NativeFunction<Uniffi{}>>", nm.to_upper_camel_case())
     }
 
     /// Get the idiomatic Dart rendering of an exception name
@@ -73,36 +79,78 @@ impl DartCodeOracle {
         }
     }
 
+    pub fn find_lib_instance() -> dart::Tokens {
+        quote!(_UniffiLib.instance)
+    }
+
+    pub fn async_poll(
+        callable: impl Callable,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
+        let ffi_func = callable.ffi_rust_future_poll(ci);
+        quote!($(Self::find_lib_instance()).$ffi_func)
+    }
+
+    pub fn async_complete(
+        callable: impl Callable,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
+        let ffi_func = callable.ffi_rust_future_complete(ci);
+        let call = quote!($(Self::find_lib_instance()).$ffi_func);
+        let call = match callable.return_type() {
+            Some(Type::External {
+                kind: ExternalKind::DataClass,
+                name,
+                ..
+            }) => {
+                todo!("Need to convert the RustBuffer from our package to the RustBuffer of the external package")
+            }
+            _ => call,
+        };
+        call
+    }
+
+    pub fn async_free(
+        callable: impl Callable,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
+        let ffi_func = callable.ffi_rust_future_free(ci);
+        quote!($(Self::find_lib_instance()).$ffi_func)
+    }
+
+
     // TODO: Replace instances of `generate_ffi_dart_type` with ffi_type_label
-    pub fn ffi_type_label(ffi_type: Option<&FfiType>) -> dart::Tokens {
+    pub fn ffi_dart_type_label(ffi_type: Option<&FfiType>) -> dart::Tokens {
         let Some(ret_type) = ffi_type else {
             return quote!(void);
         };
-        match *ret_type {
-            FfiType::UInt8
-            | FfiType::UInt16
-            | FfiType::UInt32
-            | FfiType::UInt64
-            | FfiType::Int8
-            | FfiType::Int16
-            | FfiType::Int32
-            | FfiType::Int64 => quote!(int),
+        match ret_type {
+            FfiType::UInt8 |
+            FfiType::UInt16 |
+            FfiType::UInt32 |
+            FfiType::UInt64 |
+            FfiType::Int8 |
+            FfiType::Int16 |
+            FfiType::Int32 |
+            FfiType::Handle |
+            FfiType::Int64 => quote!(int),
             FfiType::Float32 | FfiType::Float64 => quote!(double),
             FfiType::RustBuffer(ref inner) => match inner {
                 Some(i) => quote!($i),
                 _ => quote!(RustBuffer),
             },
+            FfiType::ForeignBytes => quote!(ForeignBytes),
             FfiType::RustArcPtr(_) => quote!(Pointer<Void>),
+            FfiType::Callback (name) => quote!($(Self::ffi_callback_name(name))),
             _ => todo!("FfiType::{:?}", ret_type),
         }
     }
-
-    // TODO: Replace instances of `generate_ffi_type` with ffi_native_type_label
-    pub fn ffi_native_type_label(ffi_type: Option<&FfiType>) -> dart::Tokens {
-        let Some(ret_type) = ffi_type else {
-            return quote!(Void);
+    
+    pub fn ffi_native_type_label(ffi_ret_type: Option<&FfiType>) -> dart::Tokens {
+        let Some(ret_type) = ffi_ret_type else {
+            return quote!(Void)
         };
-        match *ret_type {
+        match ret_type {
             FfiType::UInt8 => quote!(Uint8),
             FfiType::UInt16 => quote!(Uint16),
             FfiType::UInt32 => quote!(Uint32),
@@ -113,11 +161,16 @@ impl DartCodeOracle {
             FfiType::Int64 => quote!(Int64),
             FfiType::Float32 => quote!(Float),
             FfiType::Float64 => quote!(Double),
+            FfiType::Handle => quote!(Uint64),
             FfiType::RustBuffer(ref inner) => match inner {
                 Some(i) => quote!($i),
                 _ => quote!(RustBuffer),
             },
+            FfiType::ForeignBytes => quote!(ForeignBytes),
             FfiType::RustArcPtr(_) => quote!(Pointer<Void>),
+            FfiType::Callback (name) => quote!($(Self::ffi_callback_name(name))),
+        
+
             _ => todo!("FfiType::{:?}", ret_type),
         }
     }
@@ -183,7 +236,7 @@ impl DartCodeOracle {
         match ty {
             Type::Object { .. } => inner,
             Type::String | Type::Optional { .. } | Type::Enum { .. } | Type::Sequence { .. } => {
-                quote!(toRustBuffer(api, $inner))
+                quote!(toRustBuffer($inner))
             }
             _ => inner,
         }
@@ -207,20 +260,20 @@ impl DartCodeOracle {
             | Type::Object { .. }
             | Type::Enum { .. }
             | Type::Record { .. }
-            | Type::Optional { .. } => quote!($(ty.as_codetype().lift())(api, $inner)),
+            | Type::Optional { .. } => quote!($(ty.as_codetype().lift())($inner)),
             _ => todo!("lift Type::{:?}", ty),
         }
     }
 
     // fn type_lift_optional_inner_type(inner_type: &Box<Type>, inner: dart::Tokens) -> dart::Tokens {
     //     match **inner_type {
-    //         Type::Int8 | Type::UInt8 => quote!(liftOptional(api, $inner, (api, v) => liftInt8OrUint8(v))),
-    //         Type::Int16 | Type::UInt16 => quote!(liftOptional(api, $inner, (api, v) => liftInt16OrUint16(v))),
-    //         Type::Int32 | Type::UInt32 => quote!(liftOptional(api, $inner, (api, v) => liftInt32OrUint32(v))),
-    //         Type::Int64 | Type::UInt64 => quote!(liftOptional(api, $inner, (api, v) => liftInt64OrUint64(v))),
-    //         Type::Float32 => quote!(liftOptional(api, $inner, (api, v) => liftFloat32(v))),
-    //         Type::Float64 => quote!(liftOptional(api, $inner, (api, v) => liftFloat64(v))),
-    //         Type::String => quote!(liftOptional(api, $inner, (api, v) => $(Self::type_lift_fn(inner_type, quote!(v.sublist(5))))) ),
+    //         Type::Int8 | Type::UInt8 => quote!(liftOptional($inner, (v) => liftInt8OrUint8(v))),
+    //         Type::Int16 | Type::UInt16 => quote!(liftOptional($inner, (v) => liftInt16OrUint16(v))),
+    //         Type::Int32 | Type::UInt32 => quote!(liftOptional($inner, (v) => liftInt32OrUint32(v))),
+    //         Type::Int64 | Type::UInt64 => quote!(liftOptional($inner, (v) => liftInt64OrUint64(v))),
+    //         Type::Float32 => quote!(liftOptional($inner, (v) => liftFloat32(v))),
+    //         Type::Float64 => quote!(liftOptional($inner, (v) => liftFloat64(v))),
+    //         Type::String => quote!(liftOptional($inner, (v) => $(Self::type_lift_fn(inner_type, quote!(v.sublist(5))))) ),
     //         _ => todo!("lift Option inner type: Type::{:?}", inner_type)
     //     }
     // }
@@ -244,8 +297,8 @@ impl DartCodeOracle {
             | Type::Enum { .. }
             | Type::Optional { .. }
             | Type::Record { .. }
-            | Type::Sequence { .. } => quote!($(ty.as_codetype().lower())(api, $inner)),
-            //      => quote!(lowerSequence(api, value, lowerUint8, 1)), // TODO: Write try lower primitives, then check what a sequence actually looks like and replicate it
+            | Type::Sequence { .. } => quote!($(ty.as_codetype().lower())($inner)),
+            //      => quote!(lowerSequence(value, lowerUint8, 1)), // TODO: Write try lower primitives, then check what a sequence actually looks like and replicate it
             _ => todo!("lower Type::{:?}", ty),
         }
     }
@@ -338,7 +391,7 @@ impl<T: AsType> AsCodeType for T {
             Type::Float64 => Box::new(primitives::Float64CodeType),
             Type::Boolean => Box::new(primitives::BooleanCodeType),
             Type::String => Box::new(primitives::StringCodeType),
-            Type::Duration => Box::new(primitives::DurationCodeType),
+            //Type::Duration => Box::new(primitives::DurationCodeType),
             Type::Object { name, .. } => Box::new(objects::ObjectCodeType::new(name)),
             Type::Optional { inner_type } => Box::new(compounds::OptionalCodeType::new(
                 self.as_type(),

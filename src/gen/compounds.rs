@@ -2,10 +2,21 @@ use genco::lang::dart;
 use genco::prelude::*;
 use paste::paste;
 use uniffi_bindgen::backend::CodeType;
-use uniffi_bindgen::interface::Type;
+use uniffi_bindgen::interface::{Literal, Type};
 
 use super::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::{Renderable, TypeHelperRenderer};
+
+fn render_literal(literal: &Literal, inner: &Type) -> String {
+    match literal {
+        Literal::None => "null".into(),
+        Literal::EmptySequence => "[]".into(),
+        Literal::EmptyMap => "{}".into(),
+
+        // For optionals
+        _ => DartCodeOracle::find(inner).literal(literal),
+    }
+}
 
 macro_rules! impl_code_type_for_compound {
      ($T:ty, $type_label_pattern:literal, $canonical_name_pattern: literal) => {
@@ -33,6 +44,30 @@ macro_rules! impl_code_type_for_compound {
                 fn canonical_name(&self) -> String {
                     format!($canonical_name_pattern, DartCodeOracle::find(self.inner()).canonical_name())
                 }
+
+                fn literal(&self, literal: &Literal) -> String {
+                    render_literal(literal, self.inner())
+                }
+
+                fn ffi_converter_name(&self) -> String {
+                    format!("FfiConverter{}", self.canonical_name())
+                }
+
+                fn lower(&self) -> String {
+                    format!("{}.lower", self.ffi_converter_name())
+                }
+
+                fn write(&self) -> String {
+                    format!("{}.write", self.ffi_converter_name())
+                }
+
+                fn lift(&self) -> String {
+                    format!("{}.lift", self.ffi_converter_name())
+                }
+
+                fn read(&self) -> String {
+                    format!("{}.read", self.ffi_converter_name())
+                }
             }
         }
     }
@@ -45,12 +80,29 @@ macro_rules! impl_renderable_for_compound {
                 fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
                     type_helper.include_once_check($canonical_name_pattern, &self.self_type);
                     let inner_codetype = DartCodeOracle::find(self.inner());
-                    let inner_type_label = inner_codetype.type_label();
+                    // let inner_type_label = inner_codetype.type_label();
 
                     type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
 
-                    let cl_name = &format!($canonical_name_pattern, inner_codetype.canonical_name());
-                    let type_label = &format!($type_label_pattern, &inner_type_label);
+                    let cl_name = format!("{}{}","FfiConverter",  format!($canonical_name_pattern, inner_codetype.canonical_name()));
+                    
+                    // let type_label = &format!($type_label_pattern, &inner_type_label);
+                    let type_label = &self.type_label();
+
+                    let (lift_fn, lower_fn) = if cl_name.contains("Bool") {
+                        ("FfiConverterBool().lift(intlist[5])".to_string(), "FfiConverterBool().lower(value) == true".to_string())
+                    } else if cl_name.contains("String") {
+                        // Only pass the string data to the lifter
+                        // FfiConverterInt16().lift(FfiConverterInt16().read(intlist.buffer.asByteData(), offset))
+                        (inner_codetype.lift() + "(buf, 5)" , String::from("value"))
+                    } else {
+                        (
+                            format!("{}{}{}{}{}",  &inner_codetype.lift(), "(", &inner_codetype.read(), "(intlist.buffer.asByteData(), offset", "))"),
+                            self.inner().as_codetype().lower() + "(value)",
+                            
+                        )
+                    };
+
 
                     let inner_cl_converter_name = &inner_codetype.ffi_converter_name();
                     let inner_data_type = &inner_codetype.canonical_name().replace("UInt", "Uint").replace("Double", "Float");
@@ -59,53 +111,48 @@ macro_rules! impl_renderable_for_compound {
 
                     quote! {
                         class $cl_name {
-
-                            static $type_label lift(Api api, RustBuffer buf) {
-                                return $cl_name.read(api, buf.asUint8List()).value;
-                            }
-
-                            static LiftRetVal<$type_label> read(Api api, Uint8List buf) {
-                                if (ByteData.view(buf.buffer, buf.offsetInBytes).getInt8(0) == 0){
-                                    return LiftRetVal(null, 1);
+                            
+                            static $type_label lift(RustBuffer buf, [int offset = 1]) {
+                                var intlist = buf.toIntList();
+                                if (intlist.isEmpty || intlist.first == 0){
+                                    return null;
                                 }
-                                return $inner_cl_converter_name.read(api, Uint8List.view(buf.buffer, buf.offsetInBytes + 1)).copyWithOffset(1);
+                                return $lift_fn;
                             }
 
-
-                            static int allocationSize([$type_label value]) {
+                            
+                            static RustBuffer lower($type_label value) {
                                 if (value == null) {
-                                    return 1;
-                                }
-                                return $inner_cl_converter_name.allocationSize(value) + 1;
+                                    final res = Uint8List(1);
+                                    res.first = 0;
+                                    return toRustBuffer(res);
+                                }      
+                                // converting the inner
+                                final inner = $lower_fn;
+                                // preparing the outer
+                                final offset = 1;
+                                final res = Uint8List($inner_cl_converter_name().size(value) + offset);
+                                $inner_cl_converter_name().write(inner, res.buffer.asByteData(), offset); // Sets the data starting at the offset
+                                res.first = 1;
+
+                                return toRustBuffer(res);
                             }
 
-                            static RustBuffer lower(Api api, $type_label value) {
-                                if (value == null) {
-                                    return toRustBuffer(api, Uint8List.fromList([0]));
-                                }
-
-                                final length = $cl_name.allocationSize(value);
-
-                                final Pointer<Uint8> frameData = calloc<Uint8>(length); // Allocate a pointer large enough.
-                                final buf = frameData.asTypedList(length); // Create a list that uses our pointer to copy in the data.
-
-                                $cl_name.write(api, value, buf);
-
-                                final bytes = calloc<ForeignBytes>();
-                                bytes.ref.len = length;
-                                bytes.ref.data = frameData;
-                                return RustBuffer.fromBytes(api, bytes.ref);
+                            
+                            static $type_label read(ByteData buf, int offset) {
+                                // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
+                                // considerations, after research on performance implications
+                                throw UnimplementedError("Should probably implement read now");
                             }
 
-                            static int write(Api api, $type_label value, Uint8List buf) {
-                                if (value == null) {
-                                    buf[0] = 0;
-                                    return 1;
-                                }
-                                // we have a value
-                                buf[0] = 1;
+                            
+                            static int size([$type_label value]) {
+                                return $inner_cl_converter_name().size(value!) + 4;
+                            }
 
-                                return $inner_cl_converter_name.write(api, value, Uint8List.view(buf.buffer, buf.offsetInBytes + 1)) + 1;
+                            
+                            static void write($type_label value, ByteData buffer, int offset) {
+                                throw UnimplementedError("Should probably implement writes now");
                             }
                         }
                     }
@@ -118,56 +165,99 @@ macro_rules! impl_renderable_for_compound {
         paste! {
             impl Renderable for SequenceCodeType {
                 fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-
                     type_helper.include_once_check($canonical_name_pattern, &self.self_type);
-                    let inner_codetype = self.inner().as_codetype();
-                    let inner_type_label = inner_codetype.type_label();
+                    let inner_codetype = DartCodeOracle::find(self.inner());
+                    let inner_type_label = &inner_codetype.type_label();
 
                     type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
 
-                    let cl_name = &format!($canonical_name_pattern, inner_codetype.canonical_name());
+                    let cl_name = format!("{}{}","FfiConverter",  format!($canonical_name_pattern, inner_codetype.canonical_name()));
                     let type_label = &format!("List<{}>", &inner_type_label);
 
-                    let inner_cl_converter_name = &inner_codetype.ffi_converter_name();
+                    let inner_cl_converter_name = &self.inner().as_codetype().ffi_converter_name();
                     let inner_data_type = &inner_codetype.canonical_name().replace("UInt", "Uint").replace("Double", "Float");
                     let _inner_type_signature = if inner_data_type.contains("Float") { "double" } else { "int" };
+                    // TODO: Generate the proper lifter for each of the items
 
+                    let (lift_fn, lower_fn) = if cl_name.contains("Bool") {
+                        ("BoolFfiConverter().lift(intlist[offset])".to_string(), "Uint8List.fromList([BoolFfiConverter().lower(value[i])])".to_string())
+                    } else if cl_name.contains("String") {
+                        // Only pass the string data to the lifter
+                        (inner_codetype.read() + "(buf.asTypedList().buffer.asByteData(), offset + 5)" , inner_codetype.lower() + "(value[i])")
+                    } else {
+                        (inner_codetype.read() + "(buf.asTypedList().buffer.asByteData(), offset)" ,  inner_codetype.lower() + "(value[i])")
+                    };
+                    let allocation_fn_expr = &format!("{}{}", inner_cl_converter_name.to_owned(), "().size(item)");
+                    let write_fn_expr = &format!("{}{}", inner_cl_converter_name.to_owned(), "().write(item, item_intlist.buffer.asByteData(), 0)");
+
+                    // We may need to rethink how we redo this, but it's largly due to the fact that macros_rules! confuse qoute!, try removing it, see what happens.
+                    let lift_fn_clone = lift_fn.clone();
+                    let lower_fn_clone = lower_fn.clone();
 
                     quote! {
                         class $cl_name {
-
-                            static $type_label lift(Api api, RustBuffer buf) {
-                                return $cl_name.read(api, buf.asUint8List()).value;
-                            }
-
-                            static LiftRetVal<$type_label> read(Api api, Uint8List buf) {
+                            
+                            static $type_label lift(RustBuffer buf, [int offset = 0]) {
                                 $type_label res = [];
-                                final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
-                                int offset = buf.offsetInBytes + 4;
+                                var intlist = buf.toIntList();
+                                final length = intlist.buffer.asByteData().getInt32(offset);
+                                offset += 4;
+                                intlist = intlist.sublist(offset);
+
+
                                 for (var i = 0; i < length; i++) {
-                                    final ret = $inner_cl_converter_name.read(api, Uint8List.view(buf.buffer, offset));
-                                    offset += ret.bytesRead;
-                                    res.add(ret.value);
+                                    final item = $lift_fn;
+                                    offset += $allocation_fn_expr;
+                                    res.add(item);
                                 }
-                                return LiftRetVal(res, offset - buf.offsetInBytes);
+
+                                return res;
                             }
 
-                            static int write(Api api, $type_label value, Uint8List buf) {
-                                buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
-                                int offset = buf.offsetInBytes + 4;
+                            
+                            static RustBuffer lower($type_label value) {
+                                List<Uint8List> items = [createUint8ListFromInt(value.length)];
+
                                 for (var i = 0; i < value.length; i++) {
-                                    offset += $inner_cl_converter_name.write(api, value[i], Uint8List.view(buf.buffer, offset));
+                                    $inner_type_label item = $lower_fn;
+                                    int item_size = $allocation_fn_expr;
+                                    Uint8List item_intlist = Uint8List(item_size);
+                                    $write_fn_expr;
+                                    items.add(item_intlist);
                                 }
-                                return offset - buf.offsetInBytes;
-                            }
-                            static int allocationSize($type_label value) {
-                                return value.map((l) => $inner_cl_converter_name.allocationSize(l)).reduce((a, b) => a + b) + 4;
+
+                                Uint8List uint_list = Uint8List.fromList(items.expand((inner) => inner).toList());
+
+                                return toRustBuffer(uint_list);
                             }
 
-                            static RustBuffer lower(Api api, $type_label value) {
-                                final buf = Uint8List(allocationSize(value));
-                                write(api, value, buf);
-                                return toRustBuffer(api, buf);
+                            
+                            static $type_label read(ByteData buf, int offset) {
+                                throw UnimplementedError("Should probably implement writes now");
+                            }
+
+                            
+                            static int size([$type_label? value]) {
+                                // TODO: Change allocation size to use the first 4 bits of the list given
+                                return ($inner_cl_converter_name().size() * value!.length) + 4;
+                            }
+
+                            
+                            static void write($type_label value, ByteData buf, int offset) {
+                                List<Uint8List> items = [createUint8ListFromInt(value.length)];
+
+                                for (var i = 0; i < value.length; i++) {
+                                    
+                                    $inner_type_label item = $lower_fn_clone;
+                                    int item_size = $allocation_fn_expr;
+                                    Uint8List item_intlist = Uint8List(item_size);
+                                    $write_fn_expr;
+                                    items.add(item_intlist);
+                                }
+
+                                Uint8List uint_list = Uint8List.fromList(items.expand((inner) => inner).toList());
+
+                                buf.buffer.asInt8List().setAll(offset, uint_list);
                             }
                         }
                     }
@@ -180,5 +270,5 @@ macro_rules! impl_renderable_for_compound {
 impl_code_type_for_compound!(OptionalCodeType, "{}?", "Optional{}");
 impl_code_type_for_compound!(SequenceCodeType, "List<{}>", "Sequence{}");
 
-impl_renderable_for_compound!(OptionalCodeType, "{}?", "FfiConverterOptional{}");
-impl_renderable_for_compound!(SequenceCodeType, "FfiConverterSequence{}");
+impl_renderable_for_compound!(OptionalCodeType, "{}?", "Optional{}");
+impl_renderable_for_compound!(SequenceCodeType, "Sequence{}");

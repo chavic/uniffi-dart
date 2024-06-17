@@ -29,72 +29,78 @@ impl CodeType for RecordCodeType {
     }
 
     fn literal(&self, _literal: &Literal) -> String {
-        todo!("literal not implemented");
+        unreachable!();
     }
 }
 
 impl Renderable for RecordCodeType {
+    // Semantically, it may make sense to render object here, but we don't have enough information. So we render it with help from type_helper
+    fn render(&self) -> dart::Tokens {
+        quote!()
+    }
+
     fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
         if type_helper.check(&self.id) {
             quote!()
-        } else if let Some(record_) = type_helper.get_record(&self.id) {
-            generate_record(record_, type_helper)
+        } else if let Some(obj) = type_helper.get_record(&self.id) {
+            generate_record(obj, type_helper)
         } else {
-            todo!("render_type_helper not implemented");
+            unreachable!()
         }
     }
 }
 
 pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-    let cls_name = &class_name(obj.name());
-    let ffi_conv_name = &class_name(&obj.as_codetype().ffi_converter_name());
+    let cls_name = &DartCodeOracle::class_name(obj.name());
+    let ffi_conv_name = &DartCodeOracle::class_name(&obj.as_codetype().ffi_converter_name());
     for f in obj.fields() {
         // make sure all our field types are added to the includes
         type_helper.include_once_check(&f.as_codetype().canonical_name(), &f.as_type());
     }
+
     quote! {
 
-        class $cls_name {
-            $(for f in obj.fields() => final $(generate_type(&f.as_type())) $(var_name(f.name()));)
+            class $cls_name {
+                $(for f in obj.fields() => final $(generate_type(&f.as_type())) $(var_name(f.name()));)
 
-            $(cls_name)._($(for f in obj.fields() => this.$(var_name(f.name())), ));
-        }
-
-        class $ffi_conv_name {
-
-            static $cls_name lift(Api api, RustBuffer buf) {
-                return $ffi_conv_name.read(api, buf.asUint8List()).value;
+                $(cls_name)._($(for f in obj.fields() => this.$(var_name(f.name())), ));
             }
 
-            static LiftRetVal<$cls_name> read(Api api, Uint8List buf) {
 
-                int new_offset = 0;
+            class $ffi_conv_name {
 
-                $(for f in obj.fields() =>
-                    final $(var_name(f.name()))_lifted = $(f.as_type().as_codetype().ffi_converter_name()).read(api, Uint8List.view(buf.buffer, new_offset));
-                    final $(var_name(f.name())) = $(var_name(f.name()))_lifted.value;
-                    new_offset += $(var_name(f.name()))_lifted.bytesRead;
-                )
-                return LiftRetVal($(cls_name)._(
-                    $(for f in obj.fields() => $(var_name(f.name())),)
-                ), new_offset);
-            }
+                static $cls_name lift(RustBuffer buf) {
+                    return $ffi_conv_name.read(buf.asTypedList().buffer.asByteData());
+                }
 
-            static RustBuffer lower(Api api, $cls_name value) {
-                final total_length = $(for f in obj.fields() => $(f.as_type().as_codetype().ffi_converter_name()).allocationSize(value.$(var_name(f.name()))) + ) 0;
-                final buf = Uint8List(total_length);
-                $ffi_conv_name.write(api, value, buf);
-                return toRustBuffer(api, buf);
-            }
+                static $cls_name read(ByteData buffer, [int offset = 0]) {
+                    int new_offset = offset;
+                    $(for f in obj.fields() =>
+                        final $(var_name(f.name())) = $(f.as_type().as_codetype().ffi_converter_name()).read(buffer, new_offset);
+                        new_offset += $(f.as_type().as_codetype().ffi_converter_name()).size($(var_name(f.name())));
+                    )
+                    return $(cls_name)._(
+                        $(for f in obj.fields() => $(var_name(f.name())),)
+                    );
+                }
 
-            static int write(Api api, $cls_name value, Uint8List buf) {
-                int new_offset = buf.offsetInBytes;
+                static RustBuffer lower($cls_name value) {
+                    final total_length = $(for f in obj.fields() => $(f.as_type().as_codetype().ffi_converter_name()).size(value.$(var_name(f.name()))) + ) 0;
+                    final buf = Uint8List(total_length);
+                    $ffi_conv_name.write(api, value, buf);
+                    return toRustBuffer(api, buf);
+                }
 
-                $(for f in obj.fields() =>
-                new_offset += $(f.as_type().as_codetype().ffi_converter_name()).write(api, value.$(var_name(f.name())), Uint8List.view(buf.buffer, new_offset));
-                )
-                return new_offset - buf.offsetInBytes;
+                static int write($cls_name value, ByteData buffer, int offset) {
+                    int new_offset = buf.offsetInBytes;
+
+                    $(for f in obj.fields() =>
+                    new_offset += $(f.as_type().as_codetype().ffi_converter_name()).write(api, value.$(var_name(f.name())), Uint8List.view(buf.buffer, new_offset));
+                    )
+                    return new_offset - buf.offsetInBytes;
+                }
             }
         }
     }
-}
+
+
