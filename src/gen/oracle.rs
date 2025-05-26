@@ -69,11 +69,6 @@ impl DartCodeOracle {
         format!("Uniffi{}", name.to_upper_camel_case())
     }
 
-    /// Helper method to generate the struct name based on `Type`.
-    fn struct_name(name: &str) -> String {
-        format!("Uniffi{}", name.to_upper_camel_case())
-    }
-
 
     /// Helper method to generate external Dart type labels.
     fn external_type_label(name: &str) -> String {
