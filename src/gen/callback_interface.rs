@@ -176,7 +176,7 @@ fn generate_callback_vtable_interface(callback: &CallbackInterface, _type_helper
     let methods_vec: Vec<_> = methods.into_iter().enumerate().collect();
 
     quote! {
-        final class $vtable_name extends Struct {
+        class $vtable_name extends Struct {
             $(for (index, m) in &methods_vec =>
                 external Pointer<NativeFunction<UniffiCallbackInterface$(callback.name())Method$(format!("{}",index))>> $(DartCodeOracle::fn_name(m.name()));
             )
