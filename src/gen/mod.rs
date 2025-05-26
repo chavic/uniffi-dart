@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::io::Read;
 
 use anyhow::Result;
 use camino::Utf8Path;
@@ -7,13 +8,16 @@ use camino::Utf8Path;
 use genco::fmt;
 use genco::prelude::*;
 use serde::{Deserialize, Serialize};
+use uniffi_bindgen::BindgenCrateConfigSupplier;
+use uniffi_bindgen::Component;
 // use uniffi_bindgen::MergeWith;
 use self::render::Renderer;
 use self::types::TypeHelpersRenderer;
 use crate::gen::oracle::DartCodeOracle;
-use uniffi_bindgen::{BindingGenerator, BindingsConfig, ComponentInterface};
+use uniffi_bindgen::{BindingGenerator, ComponentInterface};
 
 mod callback_interface;
+mod code_type;
 mod compounds;
 mod enums;
 mod functions;
@@ -24,6 +28,8 @@ mod records;
 mod render;
 pub mod stream;
 mod types;
+
+pub use code_type::CodeType;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -61,24 +67,7 @@ impl Config {
     }
 }
 
-impl BindingsConfig for Config {
-    fn update_from_ci(&mut self, ci: &ComponentInterface) {
-        self.package_name = Some(ci.namespace().to_owned());
-    }
 
-    fn update_from_cdylib_name(&mut self, cdylib_name: &str) {
-        self.cdylib_name = Some(cdylib_name.to_string());
-    }
-
-    fn update_from_dependency_configs(&mut self, config_map: HashMap<&str, &Self>) {
-        for (crate_name, config) in config_map {
-            if !self.external_packages.contains_key(crate_name) {
-                self.external_packages
-                    .insert(crate_name.to_string(), config.package_name());
-            }
-        }
-    }
-}
 
 pub struct DartWrapper<'a> {
     config: &'a Config,
@@ -220,30 +209,65 @@ impl BindingGenerator for DartBindingGenerator {
 
     fn write_bindings(
         &self,
-        ci: &ComponentInterface,
-        config: &Self::Config,
-        out_dir: &Utf8Path,
-        _try_format_code: bool,
+        settings: &uniffi_bindgen::GenerationSettings,
+        components: &[uniffi_bindgen::Component<Self::Config>],
     ) -> Result<()> {
-        let filename = out_dir.join(format!("{}.dart", config.cdylib_name()));
-        let tokens = DartWrapper::new(ci, config).generate();
-        let file = std::fs::File::create(filename)?;
+        for Component { ci, config, .. } in components {
+            let filename = settings
+                .out_dir
+                .join(format!("{}.dart", config.cdylib_name()));
+            let tokens = DartWrapper::new(ci, config).generate();
+            let file = std::fs::File::create(filename)?;
 
-        let mut w = fmt::IoWriter::new(file);
+            let mut w = fmt::IoWriter::new(file);
 
-        let fmt = fmt::Config::from_lang::<Dart>().with_indentation(fmt::Indentation::Space(4));
-        let config = dart::Config::default();
+            let mut fmt = fmt::Config::from_lang::<Dart>();
+            if settings.try_format_code {
+                fmt = fmt.with_indentation(fmt::Indentation::Space(2));
+            }
+            let config = dart::Config::default();
 
-        tokens.format_file(&mut w.as_formatter(&fmt), &config)?;
+            tokens.format_file(&mut w.as_formatter(&fmt), &config)?;
+        }
         Ok(())
     }
-    fn check_library_path(
+
+    fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
+        Ok(
+            match root_toml.get("bindings").and_then(|b| b.get("dart")) {
+                Some(v) => v.clone().try_into()?,
+                None => Default::default(),
+            },
+        )
+    }
+
+    fn update_component_configs(
         &self,
-        _library_path: &Utf8Path,
-        _cdylib_name: Option<&str>,
+        settings: &uniffi_bindgen::GenerationSettings,
+        components: &mut Vec<uniffi_bindgen::Component<Self::Config>>,
     ) -> Result<()> {
-        // FIXME: not sure what to check for here...?
+        for c in &mut *components {
+            c.config.cdylib_name.get_or_insert_with(|| {
+                settings
+                    .cdylib
+                    .clone()
+                    .unwrap_or_else(|| format!("uniffi_{}", c.ci.namespace()))
+            });
+        }
         Ok(())
+    }
+}
+
+
+pub struct LocalConfigSupplier(String);
+impl BindgenCrateConfigSupplier for LocalConfigSupplier {
+
+    fn get_udl(&self, _crate_name: &str, _udl_name: &str) -> Result<String> {
+        let file = std::fs::File::open(self.0.clone())?;
+        let mut reader = std::io::BufReader::new(file);
+        let mut content = String::new();
+        reader.read_to_string(&mut content)?;
+        return Ok(content);
     }
 }
 
@@ -251,15 +275,29 @@ pub fn generate_dart_bindings(
     udl_file: &Utf8Path,
     config_file_override: Option<&Utf8Path>,
     out_dir_override: Option<&Utf8Path>,
-    library_file: Option<&Utf8Path>,
-) -> Result<()> {
-    uniffi_bindgen::generate_external_bindings(
-        &DartBindingGenerator {},
+    library_file: &Utf8Path,
+    library_mode: bool,
+) -> anyhow::Result<()> {
+    if library_mode {
+        uniffi_bindgen::library_mode::generate_bindings(
+            library_file,
+            None,
+            &DartBindingGenerator {},
+            &LocalConfigSupplier(udl_file.to_string()),
+            None,
+            out_dir_override.unwrap(),
+            false,
+        )?;
+        Ok(())
+    } else {
+        uniffi_bindgen::generate_external_bindings(
+            &DartBindingGenerator {},
         udl_file,
         config_file_override,
         out_dir_override,
-        library_file,
+        Some(library_file),
         None,
         true,
-    )
+        )
+    }
 }

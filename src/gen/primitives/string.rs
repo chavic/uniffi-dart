@@ -4,7 +4,7 @@ use crate::gen::{
 };
 
 use genco::lang::dart;
-use uniffi_bindgen::backend::CodeType;
+use crate::gen::CodeType;
 
 #[derive(Debug)]
 pub struct StringCodeType;

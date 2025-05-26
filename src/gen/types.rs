@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap};
 use genco::prelude::*;
 use uniffi_bindgen::interface::AsType;
 use uniffi_bindgen::{interface::Type, ComponentInterface};
-use uniffi_bindgen::backend::CodeType;
+
 
 use super::render::{AsRenderable, Renderer, TypeHelperRenderer, Renderable};
 use super::{enums, functions, objects, oracle::AsCodeType, records};

@@ -2,7 +2,8 @@ use super::oracle::{AsCodeType, DartCodeOracle};
 use super::render::{Renderable, TypeHelperRenderer};
 use super::types::generate_type;
 use genco::prelude::*;
-use uniffi_bindgen::backend::{CodeType, Literal};
+use crate::gen::CodeType;
+use uniffi_bindgen::backend::Literal;
 use uniffi_bindgen::interface::{AsType, Record};
 
 #[derive(Debug)]

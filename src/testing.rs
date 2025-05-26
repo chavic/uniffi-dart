@@ -55,7 +55,8 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
         &udl_path,
         config_path.as_deref(),
         Some(&out_dir),
-        Some(&test_helper.cdylib_path()?),
+        &test_helper.cdylib_path()?,
+        false, // library_mode
     )?;
     for file in glob::glob(&format!("**/*.dart"))?.filter_map(Result::ok) {
         copy(

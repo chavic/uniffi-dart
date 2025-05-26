@@ -1,8 +1,10 @@
 use genco::lang::dart;
 use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
-use uniffi_bindgen::backend::CodeType;
-use uniffi_bindgen::interface::{AsType, Callable, ExternalKind, FfiType, Type};
+
+
+use crate::gen::CodeType;
+use uniffi_bindgen::interface::{AsType, Callable, FfiType, Type};
 use uniffi_bindgen::ComponentInterface;
 
 use crate::gen::primitives;
@@ -251,11 +253,11 @@ impl DartCodeOracle {
         let ffi_func = callable.ffi_rust_future_complete(ci);
         let call = quote!($(Self::find_lib_instance()).$ffi_func);
         match callable.return_type() {
-            Some(Type::External {
-                kind: ExternalKind::DataClass,
-                name: _,
-                ..
-            }) => {
+            Some(Type::External { .. }) => {
+                // Some(return_type) if ci.is_external(&return_type) => {
+                //     let ffi_type = FfiType::from(return_type);
+                //     match ffi_type {
+                // FfiType::RustBuffer(Some(ExternalFfiMetadata { .. })) => {
                 todo!("Need to convert the RustBuffer from our package to the RustBuffer of the external package")
             }
             _ => call,
