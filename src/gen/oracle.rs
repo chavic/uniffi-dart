@@ -193,30 +193,6 @@ impl DartCodeOracle {
     //     }
     // }
 
-    pub fn type_lift_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
-        match ty {
-            Type::UInt8
-            | Type::Int8
-            | Type::Int16
-            | Type::UInt16
-            | Type::Int32
-            | Type::Int64
-            | Type::UInt32
-            | Type::UInt64
-            | Type::Float32
-            | Type::Float64 => inner,
-            Type::Boolean
-            | Type::Duration
-            | Type::String
-            | Type::Object { .. }
-            | Type::Enum { .. }
-            | Type::Record { .. }
-            | Type::Optional { .. } => {
-                quote!($(ty.as_codetype().ffi_converter_name()).lift($inner))
-            }
-            _ => quote!($(ty.as_codetype().ffi_converter_name()).lift($inner)), // Fallback implementation
-        }
-    }
 
     
     pub fn type_lower_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
