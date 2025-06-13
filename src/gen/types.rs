@@ -438,6 +438,7 @@ pub fn generate_type(ty: &Type) -> dart::Tokens {
         Type::Sequence { inner_type } => quote!(List<$(generate_type(inner_type))>),
         Type::Enum { name, .. } => quote!($name),
         Type::Duration => quote!(Duration),
+        Type::Record { name, .. } => quote!($name),
         _ => todo!("Type::{:?}", ty),
     }
 }
