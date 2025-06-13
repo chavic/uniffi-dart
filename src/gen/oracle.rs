@@ -10,7 +10,7 @@ use uniffi_bindgen::ComponentInterface;
 use crate::gen::primitives;
 
 // use super::render::{AsRenderable, Renderable};
-use super::{callback_interface, compounds, enums, objects, records};
+use super::{callback_interface, compounds, custom, enums, objects, records};
 
 pub struct DartCodeOracle;
 
@@ -610,6 +610,7 @@ impl<T: AsType> AsCodeType for T {
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
             Type::Record {name, .. } => Box::new(records::RecordCodeType::new(name)),
             Type::CallbackInterface { name, .. } => Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type())),
+            Type::Custom { name, module_path, builtin } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
             _ => todo!("As Type for Type::{:?}", self.as_type()),
         }
     }
