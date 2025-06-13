@@ -19,6 +19,7 @@ use uniffi_bindgen::{BindingGenerator, ComponentInterface};
 mod callback_interface;
 mod code_type;
 mod compounds;
+mod custom;
 mod enums;
 mod functions;
 mod objects;
