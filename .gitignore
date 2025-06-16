@@ -3,6 +3,7 @@
 /Cargo.lock
 experiments/*
 .vscode/*
+.vscode/settings.json
 .aider*
 .dart_tool/*
 **/.dart_tool/*

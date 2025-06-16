@@ -164,7 +164,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             const int CALL_ERROR = 1;
             const int CALL_UNEXPECTED_ERROR = 2;
 
-            class RustCallStatus extends Struct {
+            final class RustCallStatus extends Struct {
                 @Int8()
                 external int code;
 
@@ -211,7 +211,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 Exception lift(RustBuffer errorBuf);
             }
 
-            class RustBuffer extends Struct {
+            final class RustBuffer extends Struct {
                 @Uint64()
                 external int capacity;
 
@@ -266,7 +266,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 return RustBuffer.fromBytes(bytes.ref);
             }
 
-            class ForeignBytes extends Struct {
+            final class ForeignBytes extends Struct {
                 @Int32()
                 external int len;
                 external Pointer<Uint8> data;
