@@ -216,7 +216,7 @@ impl BindingGenerator for DartBindingGenerator {
         for Component { ci, config, .. } in components {
             let filename = settings
                 .out_dir
-                .join(format!("{}.dart", config.cdylib_name()));
+                .join(format!("{}.dart", ci.namespace()));
             let tokens = DartWrapper::new(ci, config).generate();
             let file = std::fs::File::create(filename)?;
 
