@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::{cell::RefCell, collections::HashMap};
 
 use genco::prelude::*;
@@ -75,8 +76,13 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             $( for obj in self.ci.object_definitions() => $(objects::generate_object(obj, self)))
         };
 
-        // Render all the imports
-        let imports: dart::Tokens = quote!();
+        // Render all unique imports, sorted alphabetically
+        let modules_to_import = self.ci.iter_external_types()
+            .map(|ty| self.ci.namespace_for_type(ty).expect("external type should have module_path"))
+            .collect::<BTreeSet<_>>();
+        let imports: dart::Tokens = quote!(
+            $( for imp in modules_to_import => $(format!("import \"{}.dart\";", imp)))
+        );
 
         // let function_definitions = quote!($( for fun in self.ci.function_definitions() => $(functions::generate_function("this", fun, self))));
 
