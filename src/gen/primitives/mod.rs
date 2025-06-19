@@ -5,6 +5,7 @@ mod duration;
 mod string;
 
 use crate::gen::render::{Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 use genco::prelude::*;
 use paste::paste;
 use uniffi_bindgen::backend::Literal;
@@ -68,7 +69,7 @@ impl_code_type_for_primitive!(Float32CodeType, "double", "Double32");
 impl_code_type_for_primitive!(Float64CodeType, "double", "Double64");
 
 // TODO: implement BytesCodeType
-impl_renderable_for_primitive!(BytesCodeType, "Uint8List", "Uint8List", 1);
+impl_renderable_for_primitive!(BytesCodeType, "Uint8List", "Uint8List");
 impl_renderable_for_primitive!(Int8CodeType, "int", "Int8", 1);
 impl_renderable_for_primitive!(Int16CodeType, "int", "Int16", 2);
 impl_renderable_for_primitive!(Int32CodeType, "int", "Int32", 4);

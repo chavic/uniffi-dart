@@ -26,6 +26,42 @@ macro_rules! impl_code_type_for_primitive {
 }
 
 macro_rules! impl_renderable_for_primitive {
+    (BytesCodeType, $class_name:literal, $canonical_name:literal) => {
+        impl Renderable for BytesCodeType {
+            fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+                let cl_name = &self.ffi_converter_name();
+                let type_signature = &self.type_label();
+                let allocation_size = std::mem::size_of::<uniffi::RustBuffer>();
+
+                quote! {
+                    class $cl_name {
+                        static $type_signature lift(RustBuffer value) {
+                            return value.asUint8List();
+                        }
+
+                        static LiftRetVal<$type_signature> read(Uint8List buf) {
+                            final rustBuffer = toRustBuffer(buf);
+                            final bytes = rustBuffer.asUint8List();
+                            return LiftRetVal(bytes, rustBuffer.len);
+                        }
+
+                        static RustBuffer lower($type_signature value) {
+                             return toRustBuffer(value);
+                        }
+
+                        static int allocationSize([$type_signature? value]) {
+                          return $allocation_size;
+                        }
+
+                        static int write($type_signature value, Uint8List buf) {
+                            buf.setRange(0, value.length, value);
+                            return value.length;
+                        }
+                    }
+                }
+            }
+        }
+    };
     ($T:ty, $class_name:literal, $canonical_name:literal, $allocation_size:literal) => {
         impl Renderable for $T {
             fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
@@ -64,51 +100,6 @@ macro_rules! impl_renderable_for_primitive {
                             return $cl_name.allocationSize();
                         }
 
-                    }
-                }
-            }
-        }
-    };
-
-    (BytesCodeType, $class_name:literal, $canonical_name:literal, $allocation_size:literal) => {
-        impl Renderable for $T {
-            fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-                if (type_helper.check($canonical_name)) {
-                    return quote!(); // Return an empty string to avoid code duplication
-                }
-                // TODO: implement bytes ffi methods
-                quote! {
-                    class BytesFfiConverter extends FfiConverter<$canonical_name, RustBuffer> {
-                        @override
-                        LiftRetVal<int> read(Uint8List buf) {
-                            // final uint_list = buf.toIntList();
-                            // return uint_list.buffer.asByteData().get$canonical_name(1);
-                        }
-
-                        @override
-                        RustBuffer lower(int value) {
-                            // final uint_list = Uint8List.fromList([value ? 1 : 0]);
-                            // final byteData = ByteData.sublistView(buf);
-                            // byteData.setInt16(0, value, Endian.little);
-                            // return buf;
-                        }
-
-                        @override
-                        int read(ByteBuffer buf) {
-                        //     // So here's the deal, we have two choices, could use Uint8List or ByteBuffer, leaving this for later
-                        //     // performance reasons
-                        //   throw UnimplementedError("Should probably implement read now");
-                        }
-
-                        @override
-                        int allocationSize([T value]) {
-                        //   return $allocation_size; // 1 = 8bits//TODO: Add correct allocation size for bytes, change the arugment type
-                        }
-
-                        @override
-                        void write(int value, ByteBuffer buf) {
-                            // throw UnimplementedError("Should probably implement read now");
-                        }
                     }
                 }
             }
