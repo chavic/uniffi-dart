@@ -1,7 +1,8 @@
 use genco::prelude::*;
+use crate::gen::callback_interface::{generate_callback_functions, generate_callback_interface, generate_callback_interface_vtable_init_function, generate_callback_vtable_interface};
 use crate::gen::CodeType;
-use uniffi_bindgen::backend::Literal;
-use uniffi_bindgen::interface::{AsType, Method, Object};
+use uniffi_bindgen::backend::{Literal, Type};
+use uniffi_bindgen::interface::{Argument, AsType, Method, Object, ObjectImpl};
 
 use crate::gen::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::AsRenderable;
@@ -12,11 +13,12 @@ use super::stream::generate_stream;
 #[derive(Debug)]
 pub struct ObjectCodeType {
     id: String,
+    imp: ObjectImpl,
 }
 
 impl ObjectCodeType {
-    pub fn new(id: String) -> Self {
-        Self { id }
+    pub fn new(id: String, imp: ObjectImpl) -> Self {
+        Self { id, imp }
     }
 }
 
@@ -34,7 +36,11 @@ impl CodeType for ObjectCodeType {
     }
 
     fn ffi_converter_name(&self) -> String {
-        self.canonical_name().to_string() // Objects will use factory methods
+        match self.imp {
+            ObjectImpl::Struct => self.canonical_name().to_string(), // Objects will use factory methods
+            ObjectImpl::CallbackTrait => format!("FfiConverterCallbackInterface{}", self.id),
+            ObjectImpl::Trait => todo!("trait objects not supported"),
+        }
     }
 }
 
@@ -51,6 +57,23 @@ impl Renderable for ObjectCodeType {
 }
 pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
     type_helper.include_once_check(obj.name(), &obj.as_type());
+
+    if obj.has_callback_interface() {
+        let interface = generate_callback_interface(obj.name(), &obj.as_codetype().ffi_converter_name(), &obj.methods(), type_helper);
+        let vtable_interface = generate_callback_vtable_interface(obj.name(), &obj.methods());
+        let functions = generate_callback_functions(obj.name(), &obj.methods());
+        let vtable_init = generate_callback_interface_vtable_init_function(
+            obj.name(),
+            &obj.methods(),
+            type_helper.get_ci().namespace_for_type(&obj.as_type()).expect("object should have namespace")
+        );
+        return quote!(
+            $interface
+            $vtable_interface
+            $functions
+            $vtable_init
+        )
+    }
 
     let cls_name = &DartCodeOracle::class_name(obj.name());
     let finalizer_cls_name = &format!("{}Finalizer", cls_name);
@@ -152,13 +175,21 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         (quote!(void), quote!((_) {}))
     };
 
+    fn lower_arg(arg: &Argument) -> dart::Tokens {
+        let lower_arg = DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name())))); 
+        match arg.as_type() {
+            Type::Object { imp, .. } if imp == ObjectImpl::CallbackTrait => quote!(Pointer<Void>.fromAddress($(lower_arg))),
+            _ => lower_arg
+        }
+    }
+
     if func.is_async() {
         quote!(
             Future<$ret> $(DartCodeOracle::fn_name(func.name()))($args) {
                 return uniffiRustCallAsync(
                   () => $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                     uniffiClonePointer(),
-                    $(for arg in &func.arguments() => $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),)
+                    $(for arg in &func.arguments() => $(lower_arg(arg)),)
                   ),
                   $(DartCodeOracle::async_poll(func, type_helper.get_ci())),
                   $(DartCodeOracle::async_complete(func, type_helper.get_ci())),
@@ -175,7 +206,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                     return rustCall((status) {
                         $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                             uniffiClonePointer(),
-                            $(for arg in &func.arguments() => $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),) status
+                            $(for arg in &func.arguments() => $(lower_arg(arg)),) status
                         );
                     });
                 }
@@ -185,7 +216,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                 $ret $(DartCodeOracle::fn_name(func.name()))($args) {
                     return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
-                        $(for arg in &func.arguments() => $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),) status
+                        $(for arg in &func.arguments() => $(lower_arg(arg)),) status
                     )));
                 }
             )

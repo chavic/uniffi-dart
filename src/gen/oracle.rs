@@ -606,7 +606,7 @@ impl<T: AsType> AsCodeType for T {
             Type::String => Box::new(primitives::StringCodeType),
             Type::Duration => Box::new(primitives::DurationCodeType),
             Type::Bytes => Box::new(primitives::BytesCodeType),
-            Type::Object { name, .. } => Box::new(objects::ObjectCodeType::new(name)),
+            Type::Object { name, imp, .. } => Box::new(objects::ObjectCodeType::new(name, imp)),
             Type::Optional { inner_type } => Box::new(compounds::OptionalCodeType::new(
                 self.as_type(),
                 *inner_type,
