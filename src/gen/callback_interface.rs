@@ -1,7 +1,7 @@
 use genco::prelude::*;
 use crate::gen::CodeType;
 use uniffi_bindgen::interface::Type;
-use uniffi_bindgen::interface::{AsType, Method, CallbackInterface};
+use uniffi_bindgen::interface::{AsType, Method};
 
 use crate::gen::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::AsRenderable;
@@ -40,10 +40,10 @@ impl Renderable for CallbackInterfaceCodeType {
         let callback = type_helper.get_ci().get_callback_interface_definition(&self.name).unwrap();
         
         // Generate all necessary components for the callback interface
-        let interface = generate_callback_interface(&self, type_helper);
-        let vtable_interface = generate_callback_vtable_interface(&callback, type_helper);
-        let functions = generate_callback_functions(&callback, type_helper);
-        let vtable_init = generate_callback_interface_vtable_init_funtion(&callback, type_helper);
+        let interface = generate_callback_interface(callback.name(), &callback.as_codetype().ffi_converter_name(), &callback.methods(), type_helper);
+        let vtable_interface = generate_callback_vtable_interface(callback.name(), &callback.methods());
+        let functions = generate_callback_functions(callback.name(), &callback.methods());
+        let vtable_init = generate_callback_interface_vtable_init_function(callback.name(), &callback.methods(), "callbacks");
         
         quote! {
             $interface
@@ -54,21 +54,19 @@ impl Renderable for CallbackInterfaceCodeType {
     }
 }
 
-fn generate_callback_interface(
-    callback_codetype: &CallbackInterfaceCodeType,
+pub fn generate_callback_interface(
+    callback_name: &str,
+    ffi_converter_name: &str,
+    methods: &[&Method],
     type_helper: &dyn TypeHelperRenderer,
 ) -> dart::Tokens {
-    let callback = type_helper.get_ci().get_callback_interface_definition(&callback_codetype.name).unwrap(); // The context here gurantees it always exists, could refactor. 
-    let cls_name = &DartCodeOracle::class_name(callback.name());
-    let ffi_conv_name = &DartCodeOracle::class_name(&callback.as_codetype().ffi_converter_name());
-    let methods = callback.methods();
-    let _vtable_methods = callback.vtable_methods();
-
+    let cls_name = &DartCodeOracle::class_name(callback_name);
+    let ffi_conv_name = &DartCodeOracle::class_name(ffi_converter_name);
 
     let tokens = quote! {
         // This is the abstract class to be implemented
         abstract class $cls_name {
-            $(for m in &methods {
+            $(for m in methods {
                 $(generate_callback_methods_definitions(m, type_helper))
             })
         }
@@ -102,7 +100,7 @@ fn generate_callback_interface(
         }
 
         // We must define callback signatures
-        $(generate_callback_methods_signatures(cls_name, &methods, type_helper))
+        $(generate_callback_methods_signatures(cls_name, methods, type_helper))
     };
 
     tokens
@@ -129,7 +127,7 @@ fn generate_callback_methods_definitions(method: &Method, type_helper: &dyn Type
     )
 }
 
-fn generate_callback_methods_signatures(callback_name: &str, methods: &Vec<&Method>, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method], _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
     let mut tokens = dart::Tokens::new();
     for (method_index, method) in methods.iter().enumerate() {
         //let method_name = DartCodeOracle::fn_name(method.name());
@@ -170,29 +168,27 @@ fn generate_callback_methods_signatures(callback_name: &str, methods: &Vec<&Meth
     tokens
 }
 
-fn generate_callback_vtable_interface(callback: &CallbackInterface, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-    let vtable_name = format!("UniffiVTableCallbackInterface{}", callback.name());
-    let methods = callback.methods();
+pub fn generate_callback_vtable_interface(callback_name: &str, methods: &[&Method]) -> dart::Tokens {
+    let vtable_name = format!("UniffiVTableCallbackInterface{}", callback_name);
     let methods_vec: Vec<_> = methods.into_iter().enumerate().collect();
 
     quote! {
-        class $vtable_name extends Struct {
+        final class $vtable_name extends Struct {
             $(for (index, m) in &methods_vec =>
-                external Pointer<NativeFunction<UniffiCallbackInterface$(callback.name())Method$(format!("{}",index))>> $(DartCodeOracle::fn_name(m.name()));
+                external Pointer<NativeFunction<UniffiCallbackInterface$(callback_name)Method$(format!("{}",index))>> $(DartCodeOracle::fn_name(m.name()));
             )
-            external Pointer<NativeFunction<UniffiCallbackInterface$(callback.name())Free>> uniffiFree;
+            external Pointer<NativeFunction<UniffiCallbackInterface$(callback_name)Free>> uniffiFree;
         }
     }
 }
 
-fn generate_callback_functions(callback: &CallbackInterface, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {    
-    let cls_name = &DartCodeOracle::class_name(callback.name());
-    let methods = callback.methods();
+pub fn generate_callback_functions(callback_name: &str, methods: &[&Method]) -> dart::Tokens {    
+    let cls_name = &DartCodeOracle::class_name(callback_name);
 
     let functions: Vec<dart::Tokens> = methods.iter().enumerate().map(|(index, m)| {
         let method_name = &format!("{}", &DartCodeOracle::fn_name(m.name()));
-        let ffi_method_type = &format!("UniffiCallbackInterface{}Method{}", callback.name(), index);
-        let _dart_method_type = &format!("UniffiCallbackInterface{}Method{}Dart", callback.name(), index);
+        let ffi_method_type = &format!("UniffiCallbackInterface{}Method{}", callback_name, index);
+        let _dart_method_type = &format!("UniffiCallbackInterface{}Method{}Dart", callback_name, index);
 
         // Get parameter types using the oracle
         let param_types: Vec<dart::Tokens> = m.arguments().iter().map(|arg| {
@@ -223,7 +219,7 @@ fn generate_callback_functions(callback: &CallbackInterface, _type_helper: &dyn 
         let out_return_type = DartCodeOracle::callback_out_return_type(m.return_type());
 
         // Generate the function body
-        let callback_method_name = &format!("{}{}", &DartCodeOracle::fn_name(callback.name()), &DartCodeOracle::class_name(m.name()));
+        let callback_method_name = &format!("{}{}", &DartCodeOracle::fn_name(callback_name), &DartCodeOracle::class_name(m.name()));
         
         quote! {
             void $callback_method_name(int uniffiHandle, $(for param in &param_types => $param,) $out_return_type outReturn, Pointer<RustCallStatus> callStatus) {
@@ -244,9 +240,9 @@ fn generate_callback_functions(callback: &CallbackInterface, _type_helper: &dyn 
     }).collect();
 
     // Free callback
-    let free_callback_fn = &format!("{}FreeCallback", DartCodeOracle::fn_name(callback.name()));
-    let free_callback_pointer = &format!("{}FreePointer", DartCodeOracle::fn_name(callback.name()));
-    let free_callback_type = &format!("UniffiCallbackInterface{}Free", callback.name());
+    let free_callback_fn = &format!("{}FreeCallback", DartCodeOracle::fn_name(callback_name));
+    let free_callback_pointer = &format!("{}FreePointer", DartCodeOracle::fn_name(callback_name));
+    let free_callback_type = &format!("UniffiCallbackInterface{}Free", callback_name);
     
     quote! {
         $(functions)
@@ -264,23 +260,23 @@ fn generate_callback_functions(callback: &CallbackInterface, _type_helper: &dyn 
     }
 }
 
-fn generate_callback_interface_vtable_init_funtion(callback: &CallbackInterface, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-    let vtable_name = &format!("UniffiVTableCallbackInterface{}", callback.name());
-    let vtable_static_instance_name = format!("{}{}", DartCodeOracle::fn_name(callback.name()), "VTable");
-    let init_fn_name = &format!("init{}VTable", callback.name());
+pub fn generate_callback_interface_vtable_init_function(callback_name: &str, methods: &[&Method], namespace: &str) -> dart::Tokens {
+    let vtable_name = &format!("UniffiVTableCallbackInterface{}", callback_name);
+    let vtable_static_instance_name = format!("{}{}", DartCodeOracle::fn_name(callback_name), "VTable");
+    let init_fn_name = &format!("init{}VTable", callback_name);
 
     quote! {
         late final Pointer<$vtable_name> $(&vtable_static_instance_name);
 
         void $init_fn_name() {
             $(&vtable_static_instance_name) = calloc<$vtable_name>();
-            $(for m in &callback.methods() {
-                $(&vtable_static_instance_name).ref.$(DartCodeOracle::fn_name(m.name())) = $(DartCodeOracle::fn_name(callback.name()))$(DartCodeOracle::class_name(m.name()))Pointer;
+            $(for m in methods {
+                $(&vtable_static_instance_name).ref.$(DartCodeOracle::fn_name(m.name())) = $(DartCodeOracle::fn_name(callback_name))$(DartCodeOracle::class_name(m.name()))Pointer;
             })
-            $(&vtable_static_instance_name).ref.uniffiFree = $(format!("{}FreePointer", DartCodeOracle::fn_name(callback.name())));
+            $(&vtable_static_instance_name).ref.uniffiFree = $(format!("{}FreePointer", DartCodeOracle::fn_name(callback_name)));
 
             rustCall((status) {
-                _UniffiLib.instance.uniffi_callbacks_fn_init_callback_vtable_$(callback.name().to_lowercase())(
+                _UniffiLib.instance.uniffi_$(namespace)_fn_init_callback_vtable_$(callback_name.to_lowercase())(
                     $(vtable_static_instance_name),
                 );
                 checkCallStatus(NullRustCallStatusErrorHandler(), status);
