@@ -254,6 +254,7 @@ impl DartCodeOracle {
                 | Type::Int64 => quote!(int),
                 Type::Float32 | Type::Float64 => quote!(double),
                 Type::Boolean => quote!(bool),
+                Type::Bytes => quote!(Uint8List),
                 Type::String => quote!(String),
                 Type::Timestamp => quote!(DateTime),
                 Type::Duration => quote!(Duration),
@@ -313,6 +314,7 @@ impl DartCodeOracle {
                 Type::Float32 => quote!(Float),
                 Type::Float64 => quote!(Double),
                 Type::Boolean => quote!(Int8),
+                Type::Bytes => quote!(RustBuffer),
                 Type::String => quote!(RustBuffer),
                 Type::Timestamp => quote!(Int64),
                 Type::Duration => quote!(Int64),
@@ -355,6 +357,7 @@ impl DartCodeOracle {
                 Type::Float32 => quote!(double),
                 Type::Float64 => quote!(double),
                 Type::Boolean => quote!(int),
+                Type::Bytes => quote!(RustBuffer),
                 Type::String => quote!(RustBuffer),
                 Type::Timestamp => quote!(int),
                 Type::Duration => quote!(int),
@@ -386,6 +389,7 @@ impl DartCodeOracle {
     pub fn callback_param_type(arg_type: &Type, arg_name: &str) -> dart::Tokens {
         match arg_type {
             Type::Boolean => quote!(int $arg_name),
+            Type::Bytes => quote!(RustBuffer $(arg_name)Buffer),
             Type::String => quote!(RustBuffer $(arg_name)Buffer),
             Type::Optional { inner_type } => {
                 if let Type::String = **inner_type {
@@ -508,6 +512,8 @@ impl DartCodeOracle {
         // Use index-based variable names to avoid conflicts
         if let Type::Boolean = arg_type {
             quote!(final bool_arg$(arg_idx) = $arg_name == 1;)
+        } else if let Type::Bytes = arg_type {
+            quote!(final arg$(arg_idx) = FfiConverterUint8List.lift($(arg_name)Buffer);)
         } else if let Type::String = arg_type {
             quote!(final arg$(arg_idx) = FfiConverterString.lift($(arg_name)Buffer);)
         } else if let Type::Optional { inner_type } = arg_type {
