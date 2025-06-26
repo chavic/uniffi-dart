@@ -377,6 +377,7 @@ impl DartCodeOracle {
                     quote!(RustBuffer $arg_name)
                 }
             },
+            Type::Record { .. } => quote!(RustBuffer $arg_name),
             _ => {
                 let type_label = DartCodeOracle::dart_type_label(Some(arg_type));
                 quote!($type_label $arg_name)
