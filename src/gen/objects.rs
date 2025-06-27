@@ -61,7 +61,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     if obj.has_callback_interface() {
         let interface = generate_callback_interface(obj.name(), &obj.as_codetype().ffi_converter_name(), &obj.methods(), type_helper);
         let vtable_interface = generate_callback_vtable_interface(obj.name(), &obj.methods());
-        let functions = generate_callback_functions(obj.name(), &obj.methods());
+        let functions = generate_callback_functions(obj.name(), &obj.methods(), type_helper);
         let vtable_init = generate_callback_interface_vtable_init_function(
             obj.name(),
             &obj.methods(),

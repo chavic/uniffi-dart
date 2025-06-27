@@ -80,8 +80,12 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
         let modules_to_import = self.ci.iter_external_types()
             .map(|ty| self.ci.namespace_for_type(ty).expect("external type should have module_path"))
             .collect::<BTreeSet<_>>();
+        // The second import statement uses a library prefix, to distinguish conflicting identifiers e.g. RustBuffer vs. ext.RustBuffer
         let imports: dart::Tokens = quote!(
-            $( for imp in modules_to_import => $(format!("import \"{}.dart\";", imp)))
+            $( for imp in modules_to_import {
+                $(format!("import \"{}.dart\"", imp));
+                $(format!("import \"{}.dart\"", imp)) as $imp;
+            })
         );
 
         // let function_definitions = quote!($( for fun in self.ci.function_definitions() => $(functions::generate_function("this", fun, self))));

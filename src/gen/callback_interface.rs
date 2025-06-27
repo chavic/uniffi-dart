@@ -42,7 +42,7 @@ impl Renderable for CallbackInterfaceCodeType {
         // Generate all necessary components for the callback interface
         let interface = generate_callback_interface(callback.name(), &callback.as_codetype().ffi_converter_name(), &callback.methods(), type_helper);
         let vtable_interface = generate_callback_vtable_interface(callback.name(), &callback.methods());
-        let functions = generate_callback_functions(callback.name(), &callback.methods());
+        let functions = generate_callback_functions(callback.name(), &callback.methods(), type_helper);
         let vtable_init = generate_callback_interface_vtable_init_function(callback.name(), &callback.methods(), "callbacks");
         
         quote! {
@@ -127,7 +127,7 @@ fn generate_callback_methods_definitions(method: &Method, type_helper: &dyn Type
     )
 }
 
-fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method], _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method], type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
     let mut tokens = dart::Tokens::new();
     for (method_index, method) in methods.iter().enumerate() {
         //let method_name = DartCodeOracle::fn_name(method.name());
@@ -145,17 +145,17 @@ fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method]
         );
         
         let method_return_type = if let Some(ret) = method.return_type() {
-            DartCodeOracle::native_type_label(Some(ret))
+            DartCodeOracle::native_type_label(Some(ret), type_helper.get_ci())
         } else {
             quote!(Void)
         };
 
         tokens.append(quote! {
             typedef $ffi_method_type = Void Function(
-                Uint64, $(for arg in &method.arguments() => $(DartCodeOracle::native_type_label(Some(&arg.as_type()))),)
+                Uint64, $(for arg in &method.arguments() => $(DartCodeOracle::native_type_label(Some(&arg.as_type()), type_helper.get_ci())),)
                 Pointer<$(&method_return_type)>, Pointer<RustCallStatus>);
             typedef $dart_method_type = void Function(
-                int, $(for arg in &method.arguments() => $(DartCodeOracle::native_dart_type_label(Some(&arg.as_type()))),)
+                int, $(for arg in &method.arguments() => $(DartCodeOracle::native_dart_type_label(Some(&arg.as_type()), type_helper.get_ci())),)
                 Pointer<$(&method_return_type)>, Pointer<RustCallStatus>);
         });
     }
@@ -182,7 +182,7 @@ pub fn generate_callback_vtable_interface(callback_name: &str, methods: &[&Metho
     }
 }
 
-pub fn generate_callback_functions(callback_name: &str, methods: &[&Method]) -> dart::Tokens {    
+pub fn generate_callback_functions(callback_name: &str, methods: &[&Method], type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {    
     let cls_name = &DartCodeOracle::class_name(callback_name);
 
     let functions: Vec<dart::Tokens> = methods.iter().enumerate().map(|(index, m)| {
@@ -193,7 +193,7 @@ pub fn generate_callback_functions(callback_name: &str, methods: &[&Method]) -> 
         // Get parameter types using the oracle
         let param_types: Vec<dart::Tokens> = m.arguments().iter().map(|arg| {
             let arg_name = DartCodeOracle::var_name(arg.name());
-            DartCodeOracle::callback_param_type(&arg.as_type(), &arg_name)
+            DartCodeOracle::callback_param_type(&arg.as_type(), &arg_name, type_helper.get_ci())
         }).collect();
 
         // Get argument lifts using the oracle

@@ -1,6 +1,7 @@
 use genco::lang::dart;
 use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
+use uniffi_bindgen::interface::ffi::ExternalFfiMetadata;
 
 
 use crate::gen::CodeType;
@@ -83,8 +84,25 @@ impl DartCodeOracle {
         quote!(_UniffiLib.instance)
     }
 
+    /// Helper method to fully qualify imports of external `RustBuffer`s
+    fn rust_buffer_name(meta: &Option<ExternalFfiMetadata>, ci: &ComponentInterface) -> dart::Tokens {
+        if let Some(meta) = meta {
+            return Self::rust_buffer_name_with_path(&meta.module_path, ci);
+        }
+        quote!(RustBuffer)
+    }
+
+    /// Helper method to fully qualify imports of external `RustBuffer`s
+    fn rust_buffer_name_with_path(module_path: &str, ci: &ComponentInterface) -> dart::Tokens {
+        let namespace = ci.namespace_for_module_path(module_path).expect("module path should exist");
+        if namespace != ci.namespace() {
+            return quote!($(namespace).RustBuffer);
+        }
+        quote!(RustBuffer)
+    }
+
     // TODO: Replace instances of `generate_ffi_dart_type` with ffi_type_label
-    pub fn ffi_dart_type_label(ffi_type: Option<&FfiType>) -> dart::Tokens {
+    pub fn ffi_dart_type_label(ffi_type: Option<&FfiType>, ci: &ComponentInterface) -> dart::Tokens {
         if let Some(ret_type) = ffi_type {
             match ret_type {
                 FfiType::Int8 => quote!(int),
@@ -98,7 +116,7 @@ impl DartCodeOracle {
                 FfiType::Float32 => quote!(double),
                 FfiType::Float64 => quote!(double),
                 FfiType::RustArcPtr(_) => quote!(Pointer<Void>),
-                FfiType::RustBuffer(_t) => quote!(RustBuffer),
+                FfiType::RustBuffer(ext) => Self::rust_buffer_name(ext, ci),
                 FfiType::ForeignBytes => quote!(ForeignBytes),
                 FfiType::Handle => quote!(Pointer<Void>),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
@@ -110,7 +128,7 @@ impl DartCodeOracle {
         }
     }
 
-    pub fn ffi_native_type_label(ffi_ret_type: Option<&FfiType>) -> dart::Tokens {
+    pub fn ffi_native_type_label(ffi_ret_type: Option<&FfiType>, ci: &ComponentInterface) -> dart::Tokens {
         if let Some(ret_type) = ffi_ret_type {
             match ret_type {
                 FfiType::Int8 => quote!(Int8),
@@ -124,7 +142,7 @@ impl DartCodeOracle {
                 FfiType::Float32 => quote!(Float),
                 FfiType::Float64 => quote!(Double),
                 FfiType::RustArcPtr(_) => quote!(Pointer<Void>),
-                FfiType::RustBuffer(_t) => quote!(RustBuffer),
+                FfiType::RustBuffer(ext) => Self::rust_buffer_name(ext, ci),
                 FfiType::ForeignBytes => quote!(ForeignBytes),
                 FfiType::Handle => quote!(Pointer<Void>),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
@@ -278,7 +296,7 @@ impl DartCodeOracle {
     }
 
     /// Get the native Dart FFI type rendering based on `Type`.
-    pub fn native_type_label(native_ret_type: Option<&Type>) -> dart::Tokens {
+    pub fn native_type_label(native_ret_type: Option<&Type>, ci: &ComponentInterface) -> dart::Tokens {
         if let Some(ret_type) = native_ret_type {
             match ret_type {
                 Type::UInt8 => quote!(Uint8),
@@ -304,7 +322,7 @@ impl DartCodeOracle {
                 Type::Map { .. } => quote!(RustBuffer),
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(Int32),
-                Type::Record { .. } => quote!(RustBuffer),
+                Type::Record { module_path, .. } => Self::rust_buffer_name_with_path(module_path, ci),
                 Type::Custom { name, .. } => {
                     let class_name = &DartCodeOracle::class_name(name);
                     quote!($class_name)
@@ -317,7 +335,7 @@ impl DartCodeOracle {
     }
 
     /// Get the native Dart FFI type rendering based on `Type`.
-    pub fn native_dart_type_label(native_ret_type: Option<&Type>) -> dart::Tokens {
+    pub fn native_dart_type_label(native_ret_type: Option<&Type>, ci: &ComponentInterface) -> dart::Tokens {
         if let Some(ret_type) = native_ret_type {
             match ret_type {
                 Type::UInt8
@@ -343,7 +361,7 @@ impl DartCodeOracle {
                 Type::Map { .. } => quote!(RustBuffer),
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(int),
-                Type::Record { .. } => quote!(RustBuffer),
+                Type::Record { module_path, .. } => Self::rust_buffer_name_with_path(module_path, ci),
                 Type::Custom { name, .. } => {
                     let type_name = &DartCodeOracle::class_name(name);
                     quote!($type_name)
@@ -356,7 +374,7 @@ impl DartCodeOracle {
     }
 
     // Method to get the appropriate callback parameter type
-    pub fn callback_param_type(arg_type: &Type, arg_name: &str) -> dart::Tokens {
+    pub fn callback_param_type(arg_type: &Type, arg_name: &str, ci: &ComponentInterface) -> dart::Tokens {
         match arg_type {
             Type::Boolean => quote!(int $arg_name),
             Type::Bytes => quote!(RustBuffer $(arg_name)Buffer),
@@ -377,7 +395,7 @@ impl DartCodeOracle {
                     quote!(RustBuffer $arg_name)
                 }
             },
-            Type::Record { .. } => quote!(RustBuffer $arg_name),
+            Type::Record { module_path, .. } => quote!($(Self::rust_buffer_name_with_path(module_path, ci)) $arg_name),
             _ => {
                 let type_label = DartCodeOracle::dart_type_label(Some(arg_type));
                 quote!($type_label $arg_name)
