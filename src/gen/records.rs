@@ -56,7 +56,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
         class $cls_name {
             $(for f in obj.fields() => final $(generate_type(&f.as_type())) $(DartCodeOracle::var_name(f.name()));)
 
-            $(cls_name)._($(for f in obj.fields() => this.$(DartCodeOracle::var_name(f.name())), ));
+            $(cls_name)($(for f in obj.fields() => this.$(DartCodeOracle::var_name(f.name())), ));
         }
 
         class $ffi_conv_name {
@@ -72,7 +72,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
                     final $(DartCodeOracle::var_name(f.name())) = $(DartCodeOracle::var_name(f.name()))_lifted.value;
                     new_offset += $(DartCodeOracle::var_name(f.name()))_lifted.bytesRead;
                 )
-                return LiftRetVal($(cls_name)._(
+                return LiftRetVal($(cls_name)(
                     $(for f in obj.fields() => $(DartCodeOracle::var_name(f.name())),)
                 ), new_offset);
             }
