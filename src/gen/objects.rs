@@ -157,8 +157,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
 
     
     // Generate toString() method for error interfaces
-    let toString_method: dart::Tokens = if is_error_interface && !obj.is_trait_interface() {
-        // Only generate toString for regular error interfaces, skip trait interfaces for now
+    let toString_method: dart::Tokens = if is_error_interface {
         let dart_class_name = format!("\"{}\"", cls_name);
         quote! {
             @override
@@ -246,7 +245,15 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         (quote!(void), quote!((_) {}))
     };
 
-    // Use centralized callback-aware argument lowering
+    // Check if function can throw errors
+    let error_handler = if let Some(error_type) = func.throws_type() {
+        let error_name = DartCodeOracle::class_name(error_type.name().unwrap_or("UnknownError"));
+        // Use the consistent Exception naming for error handlers
+        let handler_name = format!("{}ErrorHandler", error_name.to_lower_camel_case());
+        quote!($(handler_name))
+    } else {
+        quote!(null)
+    };
 
     if func.is_async() {
         quote!(
@@ -260,6 +267,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                   $(DartCodeOracle::async_complete(func, type_helper.get_ci())),
                   $(DartCodeOracle::async_free(func, type_helper.get_ci())),
                   $lifter,
+                  $error_handler,
                 );
             }
 
@@ -273,7 +281,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                             uniffiClonePointer(),
                             $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                         );
-                    });
+                    }, $error_handler);
                 }
             )
         } else {
@@ -282,7 +290,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                     return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                    )));
+                    )), $error_handler);
                 }
             )
       }
