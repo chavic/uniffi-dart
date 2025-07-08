@@ -68,7 +68,6 @@ impl_code_type_for_primitive!(UInt64CodeType, "int", "UInt64");
 impl_code_type_for_primitive!(Float32CodeType, "double", "Double32");
 impl_code_type_for_primitive!(Float64CodeType, "double", "Double64");
 
-// TODO: implement BytesCodeType
 impl_renderable_for_primitive!(BytesCodeType, "Uint8List", "Uint8List");
 impl_renderable_for_primitive!(Int8CodeType, "int", "Int8", 1);
 impl_renderable_for_primitive!(Int16CodeType, "int", "Int16", 2);

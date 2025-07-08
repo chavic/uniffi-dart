@@ -31,7 +31,6 @@ macro_rules! impl_renderable_for_primitive {
             fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
                 let cl_name = &self.ffi_converter_name();
                 let type_signature = &self.type_label();
-                let allocation_size = std::mem::size_of::<uniffi::RustBuffer>();
 
                 quote! {
                     class $cl_name {
@@ -40,9 +39,9 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         static LiftRetVal<$type_signature> read(Uint8List buf) {
-                            final rustBuffer = toRustBuffer(buf);
-                            final bytes = rustBuffer.asUint8List();
-                            return LiftRetVal(bytes, rustBuffer.len);
+                            final end = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0) + 4;
+                            final bytes = Uint8List.view(buf.buffer, 4, end);
+                            return LiftRetVal(bytes, bytes.length);
                         }
 
                         static RustBuffer lower($type_signature value) {
@@ -50,7 +49,10 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         static int allocationSize([$type_signature? value]) {
-                          return $allocation_size;
+                          if (value == null) {
+                              return 4;
+                          }
+                          return 4 + value.length;
                         }
 
                         static int write($type_signature value, Uint8List buf) {
