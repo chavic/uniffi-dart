@@ -69,7 +69,7 @@ void main() {
         try {
           oopsEnum(1);
         } catch (e) {
-          expect(e.toString(), 'ValueErrorException');
+          expect(e.toString(), 'ValueErrorException(value)');
         }
       });
 
@@ -78,7 +78,7 @@ void main() {
         try {
           oopsEnum(2);
         } catch (e) {
-          expect(e.toString(), 'IntValueErrorException');
+          expect(e.toString(), 'IntValueErrorException(2)');
         }
       });
 
@@ -87,7 +87,8 @@ void main() {
         try {
           oopsEnum(3);
         } catch (e) {
-          expect(e.toString(), 'FlatInnerExceptionErrorException');
+          expect(e.toString(),
+              'FlatInnerExceptionErrorException(FlatInner.caseA)');
         }
       });
 
@@ -96,7 +97,8 @@ void main() {
         try {
           oopsEnum(4);
         } catch (e) {
-          expect(e.toString(), 'FlatInnerExceptionErrorException');
+          expect(e.toString(),
+              'FlatInnerExceptionErrorException(FlatInner.caseB)');
         }
       });
 
@@ -105,7 +107,8 @@ void main() {
         try {
           oopsEnum(5);
         } catch (e) {
-          expect(e.toString(), 'InnerExceptionErrorException');
+          expect(
+              e.toString(), 'InnerExceptionErrorException(CaseAInner(inner))');
         }
       });
     });
@@ -116,7 +119,7 @@ void main() {
         try {
           oopsTuple(0);
         } catch (e) {
-          expect(e.toString(), 'OopsTupleException');
+          expect(e.toString(), 'OopsTupleException(oops)');
         }
       });
 
@@ -125,13 +128,13 @@ void main() {
         try {
           oopsTuple(1);
         } catch (e) {
-          expect(e.toString(), 'ValueTupleException');
+          expect(e.toString(), 'ValueTupleException(1)');
         }
       });
 
       test('Get tuple with default', () {
         final tuple = getTuple(null);
-        expect(tuple.toString(), 'OopsTupleException');
+        expect(tuple.toString(), 'OopsTupleException(oops)');
         // Remove identity check as it compares instances, not values
         // expect(getTuple(tuple), tuple);
       });
