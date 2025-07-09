@@ -65,7 +65,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
             }
 
             static LiftRetVal<$cls_name> read( Uint8List buf) {
-                int new_offset = 0;
+                int new_offset = buf.offsetInBytes;
 
                 $(for f in obj.fields() =>
                     final $(DartCodeOracle::var_name(f.name()))_lifted = $(f.as_type().as_codetype().ffi_converter_name()).read(Uint8List.view(buf.buffer, new_offset));
@@ -74,7 +74,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
                 )
                 return LiftRetVal($(cls_name)(
                     $(for f in obj.fields() => $(DartCodeOracle::var_name(f.name())),)
-                ), new_offset);
+                ), new_offset - buf.offsetInBytes);
             }
 
             static RustBuffer lower( $cls_name value) {
@@ -90,7 +90,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
                 $(for f in obj.fields() =>
                 new_offset += $(f.as_type().as_codetype().ffi_converter_name()).write(value.$(DartCodeOracle::var_name(f.name())), Uint8List.view(buf.buffer, new_offset));
                 )
-                return new_offset;
+                return new_offset - buf.offsetInBytes;
             }
 
             static int allocationSize($cls_name value) {
