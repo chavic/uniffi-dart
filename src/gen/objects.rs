@@ -233,7 +233,6 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             }
 
             $to_string_method
-            $to_string_method
 
             $(for mt in &obj.methods() => $(generate_method(mt, type_helper)))
         }
