@@ -35,7 +35,22 @@ macro_rules! impl_renderable_for_primitive {
                 quote! {
                     class $cl_name {
                         static $type_signature lift(RustBuffer value) {
-                            return value.asUint8List();
+                            final bufferData = value.asUint8List();
+                            if (bufferData.length < 4) {
+                                throw UniffiInternalError(UniffiInternalError.bufferOverflow, "Buffer too small for length prefix");
+                            }
+                            
+                            final length = bufferData.buffer.asByteData(bufferData.offsetInBytes).getInt32(0);
+                            
+                            if (length < 0) {
+                                throw UniffiInternalError(UniffiInternalError.incompleteData, "Negative byte array length");
+                            }
+                            
+                            if (bufferData.offsetInBytes + 4 + length > bufferData.buffer.lengthInBytes) {
+                                throw UniffiInternalError(UniffiInternalError.bufferOverflow, "Buffer overflow reading byte array");
+                            }
+                            
+                            return Uint8List.view(bufferData.buffer, bufferData.offsetInBytes + 4, length);
                         }
 
                         static LiftRetVal<$type_signature> read(Uint8List buf) {
@@ -61,7 +76,11 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         static RustBuffer lower($type_signature value) {
-                             return toRustBuffer(value);
+                            final totalSize = allocationSize(value);
+                            final buffer = RustBuffer.alloc(totalSize);
+                            final bufferData = buffer.data.asTypedList(totalSize);
+                            write(value, bufferData);
+                            return buffer;
                         }
 
                         static int allocationSize([$type_signature? value]) {
