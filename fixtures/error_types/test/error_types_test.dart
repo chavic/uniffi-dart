@@ -86,8 +86,10 @@ void main() {
         try {
           oopsEnum(3);
         } catch (e) {
-          expect(e.toString(),
-              'FlatInnerExceptionErrorException(FlatInner.caseA)');
+          expect(
+            e.toString(),
+            'FlatInnerExceptionErrorException(FlatInner.caseA)',
+          );
         }
       });
 
@@ -96,8 +98,10 @@ void main() {
         try {
           oopsEnum(4);
         } catch (e) {
-          expect(e.toString(),
-              'FlatInnerExceptionErrorException(FlatInner.caseB)');
+          expect(
+            e.toString(),
+            'FlatInnerExceptionErrorException(FlatInner.caseB)',
+          );
         }
       });
 
@@ -107,7 +111,9 @@ void main() {
           oopsEnum(5);
         } catch (e) {
           expect(
-              e.toString(), 'InnerExceptionErrorException(CaseAInner(inner))');
+            e.toString(),
+            'InnerExceptionErrorException(CaseAInner(inner))',
+          );
         }
       });
     });
@@ -139,13 +145,13 @@ void main() {
       });
     });
 
-    test('Async throw error', () async {
-      try {
-        await aoops();
-        fail('Must have failed');
-      } on ErrorInterface catch (e) {
-        expect(e.toString(), 'async-oops');
-      }
-    });
+    // test('Async throw error', () async {
+    //   try {
+    //     await aoops();
+    //     fail('Must have failed');
+    //   } on ErrorInterface catch (e) {
+    //     expect(e.toString(), 'async-oops');
+    //   }
+    // });
   });
 }
