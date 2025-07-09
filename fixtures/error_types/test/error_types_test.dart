@@ -27,15 +27,14 @@ void main() {
       }
     });
 
-    // TODO: Re-enable when trait interfaces are fully supported
-    // test('ErrorTrait implementation', () {
-    //   try {
-    //     toops();
-    //     fail('Must have failed');
-    //   } on ErrorTrait catch (e) {
-    //     expect(e.msg(), 'trait-oops');
-    //   }
-    // });
+    test('ErrorTrait implementation', () {
+      try {
+        toops();
+        fail('Must have failed');
+      } on ErrorTrait catch (e) {
+        expect(e.msg(), 'trait-oops');
+      }
+    });
 
     test('Get error instance', () {
       final e = getError('the error');
@@ -140,14 +139,13 @@ void main() {
       });
     });
 
-    // TODO: Investigate why aoops() isn't throwing an exception
-    // test('Async throw error', () async {
-    //   try {
-    //     await aoops();
-    //     fail('Must have failed');
-    //   } on ErrorInterface catch (e) {
-    //     expect(e.toString(), 'async-oops');
-    //   }
-    // });
+    test('Async throw error', () async {
+      try {
+        await aoops();
+        fail('Must have failed');
+      } on ErrorInterface catch (e) {
+        expect(e.toString(), 'async-oops');
+      }
+    });
   });
 }
