@@ -39,7 +39,23 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         static LiftRetVal<$type_signature> read(Uint8List buf) {
+                            // Add bounds checking to prevent buffer overflow
+                            if (buf.length < 4) {
+                                throw UniffiInternalError(UniffiInternalError.bufferOverflow, "Buffer too small for length prefix");
+                            }
+                            
                             final length = buf.buffer.asByteData(buf.offsetInBytes).getInt32(0);
+                            
+                            // Check for negative length
+                            if (length < 0) {
+                                throw UniffiInternalError(UniffiInternalError.incompleteData, "Negative byte array length");
+                            }
+                            
+                            // Check if we have enough data for the length + bytes
+                            if (buf.offsetInBytes + 4 + length > buf.buffer.lengthInBytes) {
+                                throw UniffiInternalError(UniffiInternalError.bufferOverflow, "Buffer overflow reading byte array");
+                            }
+                            
                             final bytes = Uint8List.view(buf.buffer, buf.offsetInBytes + 4, length);
                             return LiftRetVal(bytes, length + 4);
                         }
@@ -56,8 +72,11 @@ macro_rules! impl_renderable_for_primitive {
                         }
 
                         static int write($type_signature value, Uint8List buf) {
-                            buf.setRange(0, value.length, value);
-                            return value.length;
+                            // Write length prefix first (4 bytes)
+                            buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, value.length);
+                            // Then write the actual bytes
+                            buf.setRange(4, 4 + value.length, value);
+                            return 4 + value.length;
                         }
                     }
                 }
