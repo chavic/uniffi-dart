@@ -1,5 +1,6 @@
 use genco::prelude::*;
-use uniffi_bindgen::backend::{CodeType, Type};
+use crate::gen::CodeType;
+use uniffi_bindgen::interface::Type;
 use uniffi_bindgen::interface::{AsType, Method, CallbackInterface};
 
 use crate::gen::oracle::{AsCodeType, DartCodeOracle};

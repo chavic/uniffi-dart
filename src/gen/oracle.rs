@@ -1,8 +1,10 @@
 use genco::lang::dart;
 use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
-use uniffi_bindgen::backend::CodeType;
-use uniffi_bindgen::interface::{AsType, Callable, ExternalKind, FfiType, Type};
+
+
+use crate::gen::CodeType;
+use uniffi_bindgen::interface::{AsType, Callable, FfiType, Type};
 use uniffi_bindgen::ComponentInterface;
 
 use crate::gen::primitives;
@@ -64,11 +66,6 @@ impl DartCodeOracle {
 
     /// Helper method to generate the callback name based on `Type`.
     fn callback_name(name: &str) -> String {
-        format!("Uniffi{}", name.to_upper_camel_case())
-    }
-
-    /// Helper method to generate the struct name based on `Type`.
-    fn struct_name(name: &str) -> String {
         format!("Uniffi{}", name.to_upper_camel_case())
     }
 
@@ -191,30 +188,6 @@ impl DartCodeOracle {
     //     }
     // }
 
-    pub fn type_lift_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
-        match ty {
-            Type::UInt8
-            | Type::Int8
-            | Type::Int16
-            | Type::UInt16
-            | Type::Int32
-            | Type::Int64
-            | Type::UInt32
-            | Type::UInt64
-            | Type::Float32
-            | Type::Float64 => inner,
-            Type::Boolean
-            | Type::Duration
-            | Type::String
-            | Type::Object { .. }
-            | Type::Enum { .. }
-            | Type::Record { .. }
-            | Type::Optional { .. } => {
-                quote!($(ty.as_codetype().ffi_converter_name()).lift($inner))
-            }
-            _ => quote!($(ty.as_codetype().ffi_converter_name()).lift($inner)), // Fallback implementation
-        }
-    }
 
     
     pub fn type_lower_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
@@ -251,11 +224,11 @@ impl DartCodeOracle {
         let ffi_func = callable.ffi_rust_future_complete(ci);
         let call = quote!($(Self::find_lib_instance()).$ffi_func);
         match callable.return_type() {
-            Some(Type::External {
-                kind: ExternalKind::DataClass,
-                name: _,
-                ..
-            }) => {
+            Some(Type::External { .. }) => {
+                // Some(return_type) if ci.is_external(&return_type) => {
+                //     let ffi_type = FfiType::from(return_type);
+                //     match ffi_type {
+                // FfiType::RustBuffer(Some(ExternalFfiMetadata { .. })) => {
                 todo!("Need to convert the RustBuffer from our package to the RustBuffer of the external package")
             }
             _ => call,

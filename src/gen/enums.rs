@@ -1,5 +1,6 @@
 use genco::prelude::*;
-use uniffi_bindgen::backend::{CodeType, Literal};
+use crate::gen::CodeType;
+use uniffi_bindgen::backend::Literal;
 use uniffi_bindgen::interface::{AsType, Enum};
 
 use super::oracle::{AsCodeType, DartCodeOracle};
@@ -55,7 +56,7 @@ impl Renderable for EnumCodeType {
 }
 
 pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-    let cls_name = &obj.as_codetype().canonical_name();
+
     let dart_cls_name = &DartCodeOracle::class_name(obj.name());
     let ffi_converter_name = &obj.as_codetype().ffi_converter_name();
     if obj.is_flat() {
@@ -96,7 +97,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             // Prepare constructor parameters
             let constructor_params = variant_obj.fields().iter().map(|field| {
                 let param_name = DartCodeOracle::var_name(field.name());
-                let param_type = field.as_type().as_renderable().render_type(&field.as_type(), type_helper);
+                let _param_type = field.as_type().as_renderable().render_type(&field.as_type(), type_helper);
                 if variant_obj.fields().len() > 1 {
                     quote!(required this.$param_name)
                 } else {
