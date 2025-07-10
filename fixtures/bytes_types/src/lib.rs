@@ -8,29 +8,29 @@ fn take_bytes(v: Vec<u8>) -> Vec<u8> {
     v
 }
 
-// #[uniffi::export]
-// fn take_bytes_with_validation(v: Vec<u8>) -> Vec<u8> {
-//     // Validate that it's valid UTF-8 if it should be
-//     if let Ok(s) = std::str::from_utf8(&v) {
-//         println!("Valid UTF-8 string: {}", s);
-//     }
-//     v
-// }
+#[uniffi::export]
+fn take_bytes_with_validation(v: Vec<u8>) -> Vec<u8> {
+    // Validate that it's valid UTF-8 if it should be
+    if let Ok(s) = std::str::from_utf8(&v) {
+        println!("Valid UTF-8 string: {}", s);
+    }
+    v
+}
 
-// #[uniffi::export]
-// fn take_empty_bytes() -> Vec<u8> {
-//     Vec::new()
-// }
+#[uniffi::export]
+fn take_empty_bytes() -> Vec<u8> {
+    Vec::new()
+}
 
-// #[uniffi::export]
-// fn get_test_bytes() -> Vec<u8> {
-//     b"Hello, UniFFI bytes!".to_vec()
-// }
+#[uniffi::export]
+fn get_test_bytes() -> Vec<u8> {
+    b"Hello, UniFFI bytes!".to_vec()
+}
 
-// #[uniffi::export]
-// fn get_binary_bytes() -> Vec<u8> {
-//     vec![0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0xFC]
-// }
+#[uniffi::export]
+fn get_binary_bytes() -> Vec<u8> {
+    vec![0x00, 0x01, 0x02, 0x03, 0xFF, 0xFE, 0xFD, 0xFC]
+}
  
 //  #[derive(Debug, PartialEq)]
 //  pub struct RecordWithBytes {
