@@ -8,7 +8,7 @@ use uniffi_bindgen::{interface::Type, ComponentInterface};
 
 use super::render::{AsRenderable, Renderer, TypeHelperRenderer, Renderable};
 use super::{enums, functions, objects, oracle::AsCodeType, records};
-use crate::gen::DartCodeOracle;
+use crate::gen::oracle::DartCodeOracle;
 
 type FunctionDefinition = dart::Tokens;
 
@@ -91,7 +91,10 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
         // let function_definitions = quote!($( for fun in self.ci.function_definitions() => $(functions::generate_function("this", fun, self))));
 
         let function_definitions = quote!(
-            $(for fun in self.ci.function_definitions() => $(functions::generate_function(fun, self)))
+            $(for fun in self.ci.function_definitions() => 
+                $(functions::generate_function(fun, self))
+                
+            )
         );
 
         let mut callback_code = quote!();
@@ -163,9 +166,9 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                     case unexpectedStaleHandle:
                     return "UniFfi::UnexpectedStaleHandle";
                     case rustPanic:
-                    return "UniFfi::rustPanic: $$panicMessage";
+                    return $[str](UniFfi::rustPanic: $panicMessage);
                     default:
-                    return "UniFfi::UnknownError: $$errorCode";
+                    return $[str](UniFfi::UnknownError: $errorCode);
                 }
                 }
             }
@@ -200,10 +203,12 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 }
             }
 
-            T rustCall<T>(T Function(Pointer<RustCallStatus>) callback) {
+            T rustCall<T>(T Function(Pointer<RustCallStatus>) callback, [UniffiRustCallStatusErrorHandler? errorHandler]) {
                 final status = calloc<RustCallStatus>();
                 try {
-                return callback(status);
+                    final result = callback(status);
+                    checkCallStatus(errorHandler ?? NullRustCallStatusErrorHandler(), status);
+                    return result;
                 } finally {
                 calloc.free(status);
                 }
@@ -447,7 +452,7 @@ pub fn generate_type(ty: &Type) -> dart::Tokens {
         Type::Boolean => quote!(bool),
         Type::Optional { inner_type } => quote!($(generate_type(inner_type))?),
         Type::Sequence { inner_type } => quote!(List<$(generate_type(inner_type))>),
-        Type::Enum { name, .. } => quote!($name),
+        Type::Enum { name, .. } => quote!($(DartCodeOracle::class_name(name))),
         Type::Duration => quote!(Duration),
         Type::Record { name, .. } => quote!($name),
         Type::Custom { name, .. } => quote!($name),

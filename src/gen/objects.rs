@@ -1,4 +1,8 @@
 use genco::prelude::*;
+use std::fmt::Debug;
+
+use std::string::ToString;
+use heck::ToLowerCamelCase;
 use crate::gen::callback_interface::{generate_callback_functions, generate_callback_interface, generate_callback_interface_vtable_init_function, generate_callback_vtable_interface};
 use crate::gen::CodeType;
 use uniffi_bindgen::backend::Literal;
@@ -98,6 +102,16 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         } else {
             quote!($cls_name.$(DartCodeOracle::fn_name(constructor_name)))
         };
+        
+        // Check if function can throw errors
+        let error_handler = if let Some(error_type) = constructor.throws_type() {
+            let error_name = DartCodeOracle::class_name(error_type.name().unwrap_or("UnknownError"));
+            // Use the consistent Exception naming for error handlers
+            let handler_name = format!("{}ErrorHandler", error_name.to_lower_camel_case());
+            quote!($(handler_name))
+        } else {
+            quote!(null)
+        };
 
         let dart_params = quote!($(for arg in constructor.arguments() =>
             $(DartCodeOracle::dart_type_label(Some(&arg.as_type()))) $(DartCodeOracle::var_name(arg.name())),
@@ -117,19 +131,62 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             $dart_constructor_decl($dart_params) : _ptr = rustCall((status) =>
                 $lib_instance.$ffi_func_name(
                     $ffi_call_args status
-                )
+                ),
+                $error_handler
             ) {
                  _$finalizer_cls_name.attach(this, _ptr, detach: this);
             }
         }
     });
 
+    // For interface objects that are used as error types, generate error handlers
+    let is_error_interface = type_helper.get_ci().is_name_used_as_error(obj.name());
+    
+    let error_handler_class = if is_error_interface {
+        // Generate error handlers for specific error interfaces
+        let error_handler_name = format!("{}ErrorHandler", cls_name);
+        let instance_name = cls_name.to_lower_camel_case();
+        quote! {
+            class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
+                @override
+                Exception lift(RustBuffer errorBuf) {
+                    return $(cls_name).read(errorBuf.asUint8List()).value;
+                }
+            }
+
+            final $(&error_handler_name) $(instance_name)ErrorHandler = $(&error_handler_name)();
+        }
+    } else {
+        quote!()
+    };
+
+    let implements_exception = if is_error_interface {
+        quote!( implements Exception)
+    } else {
+        quote!()
+    };
+
+    
+    // Generate toString() method for error interfaces
+    let to_string_method: dart::Tokens = if is_error_interface && !obj.is_trait_interface() {
+        // Only generate toString for regular error interfaces, skip trait interfaces for now
+        let dart_class_name = format!("\"{}\"", cls_name);
+        quote! {
+            @override
+            String toString() {
+                return $(&dart_class_name);
+            }
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
         final _$finalizer_cls_name = Finalizer<Pointer<Void>>((ptr) {
           rustCall((status) => $lib_instance.$ffi_object_free_name(ptr, status));
         });
 
-        class $cls_name {
+        class $cls_name $implements_exception {
             late final Pointer<Void> _ptr;
 
             // Private constructor for internal use / lift
@@ -175,8 +232,12 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
                 rustCall((status) => $lib_instance.$ffi_object_free_name(_ptr, status));
             }
 
+            $to_string_method
+
             $(for mt in &obj.methods() => $(generate_method(mt, type_helper)))
         }
+
+        $error_handler_class
 
         $(stream_glue)
     }
@@ -196,7 +257,15 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         (quote!(void), quote!((_) {}))
     };
 
-    // Use centralized callback-aware argument lowering
+    // Check if function can throw errors
+    let error_handler = if let Some(error_type) = func.throws_type() {
+        let error_name = DartCodeOracle::class_name(error_type.name().unwrap_or("UnknownError"));
+        // Use the consistent Exception naming for error handlers
+        let handler_name = format!("{}ErrorHandler", error_name.to_lower_camel_case());
+        quote!($(handler_name))
+    } else {
+        quote!(null)
+    };
 
     if func.is_async() {
         quote!(
@@ -210,6 +279,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                   $(DartCodeOracle::async_complete(func, type_helper.get_ci())),
                   $(DartCodeOracle::async_free(func, type_helper.get_ci())),
                   $lifter,
+                  $error_handler,
                 );
             }
 
@@ -223,7 +293,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                             uniffiClonePointer(),
                             $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                         );
-                    });
+                    }, $error_handler);
                 }
             )
         } else {
@@ -232,7 +302,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                     return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                    )));
+                    )), $error_handler);
                 }
             )
       }

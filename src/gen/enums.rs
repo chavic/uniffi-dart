@@ -1,7 +1,8 @@
 use genco::prelude::*;
 use crate::gen::CodeType;
 use uniffi_bindgen::backend::Literal;
-use uniffi_bindgen::interface::{AsType, Enum};
+use uniffi_bindgen::interface::{AsType, Enum, Field, Type};
+use heck::ToLowerCamelCase;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
 use super::render::{AsRenderable, Renderable, TypeHelperRenderer};
@@ -39,7 +40,7 @@ impl CodeType for EnumCodeType {
     }
 
     fn ffi_converter_name(&self) -> String {
-        format!("FfiConverter{}", &DartCodeOracle::class_name(&self.canonical_name()))
+        format!("FfiConverter{}", &DartCodeOracle::class_name(&self.id))
     }
 }
 
@@ -88,6 +89,25 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
     } else {
         let mut variants = vec![];
 
+        // helper functions to get the sanitized field name and type strings
+        fn field_name(field: &Field, field_num: usize) -> String {
+            if field.name().is_empty() { format!("v{}", field_num) } else { DartCodeOracle::var_name(field.name()) }
+        }
+        fn field_type(field: &Field, type_helper: &dyn TypeHelperRenderer) -> String {
+            field.as_type().as_renderable().render_type(&field.as_type(), type_helper).to_string().expect("Could not stringify type").replace("Error", "Exception")
+        }
+        fn field_ffi_converter_name(field: &Field) -> String {
+            field.as_type().as_codetype().ffi_converter_name().replace("Error", "Exception")
+        }
+        fn is_flat_enum(field: &Field, type_helper: &dyn TypeHelperRenderer) -> bool {
+            if let Type::Enum { name, .. } = &field.as_type() {
+                if let Some(enum_def) = type_helper.get_enum(name) {
+                    return enum_def.is_flat();
+                }
+            }
+            false
+        }
+
         for (index, variant_obj) in obj.variants().iter().enumerate() {
             for f in variant_obj.fields() {
                 type_helper.include_once_check(&f.as_codetype().canonical_name(), &f.as_type());
@@ -95,13 +115,13 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             let variant_dart_cls_name = &format!("{}{}", DartCodeOracle::class_name(variant_obj.name()), dart_cls_name);
             
             // Prepare constructor parameters
-            let constructor_params = variant_obj.fields().iter().map(|field| {
-                let param_name = DartCodeOracle::var_name(field.name());
-                let _param_type = field.as_type().as_renderable().render_type(&field.as_type(), type_helper);
+            let constructor_params = variant_obj.fields().iter().enumerate().map(|(i, field)| {
+                let param_name = field_name(field, i);
+                let param_type = field_type(field, type_helper);
                 if variant_obj.fields().len() > 1 {
-                    quote!(required this.$param_name)
+                    quote!(required $param_type this.$param_name)
                 } else {
-                    quote!(this.$param_name)
+                    quote!($param_type this.$param_name)
                 }
             }).collect::<Vec<_>>();
             
@@ -111,26 +131,93 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                 quote!($( for p in constructor_params => $p, ))
             };
             
+            // Pre-process field reading code
+            let field_read_code: Vec<dart::Tokens> = variant_obj.fields().iter().enumerate().map(|(i, field)| {
+                if is_flat_enum(field, type_helper) {
+                    // Handle flat enums specially - they serialize as int32 (4 bytes)
+                    quote!(
+                        final $(field_name(field, i))_int = buf.buffer.asByteData(new_offset).getInt32(0);
+                        final $(field_name(field, i)) = $(field_ffi_converter_name(field)).lift(toRustBuffer(createUint8ListFromInt($(field_name(field, i))_int)));
+                        new_offset += 4;
+                    )
+                } else {
+                    quote!(
+                        final $(field_name(field, i))_lifted = $(field_ffi_converter_name(field)).read(Uint8List.view(buf.buffer, new_offset));
+                        final $(field_name(field, i)) = $(field_name(field, i))_lifted.value;
+                        new_offset += $(field_name(field, i))_lifted.bytesRead;
+                    )
+                }
+            }).collect();
+
+            // Pre-process allocation size calculation
+            let allocation_parts: Vec<dart::Tokens> = variant_obj.fields().iter().enumerate().map(|(i, field)| {
+                if is_flat_enum(field, type_helper) {
+                    quote!(4 + ) // Flat enums are 4 bytes (int32)
+                } else {
+                    quote!($(field_ffi_converter_name(field)).allocationSize($(field_name(field, i))) + )
+                }
+            }).collect();
+
+            // Pre-process field write code
+            let field_write_code: Vec<dart::Tokens> = variant_obj.fields().iter().enumerate().map(|(i, field)| {
+                if is_flat_enum(field, type_helper) {
+                    // Handle flat enums specially - lower to RustBuffer and extract int32
+                    quote!(
+                        final $(field_name(field, i))_buffer = $(field_ffi_converter_name(field)).lower($(field_name(field, i)));
+                        final $(field_name(field, i))_int = $(field_name(field, i))_buffer.asUint8List().buffer.asByteData().getInt32(0);
+                        buf.buffer.asByteData(new_offset).setInt32(0, $(field_name(field, i))_int);
+                        new_offset += 4;
+                    )
+                } else {
+                    quote!(
+                        new_offset += $(field_ffi_converter_name(field)).write($(field_name(field, i)), Uint8List.view(buf.buffer, new_offset));
+                    )
+                }
+            }).collect();
+
+            // Generate simple toString() method for error enum variants
+            let to_string_method: dart::Tokens = if type_helper.get_ci().is_name_used_as_error(obj.name()) {
+                if variant_obj.has_fields() {
+                    let field_interpolations = variant_obj.fields().iter()
+                        .enumerate()
+                        .map(|(i, field)| format!("${}", field_name(field, i)))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    let to_string_with_fields = format!("\"{}({})\"", variant_dart_cls_name, field_interpolations );
+                    quote!(
+                        @override
+                        String toString() {
+                            return $(&to_string_with_fields);
+                        }
+                    )
+                } else {
+                    quote!(
+                        @override
+                        String toString() {
+                            return $(format!("\"{}\"", variant_dart_cls_name));
+                        }
+                    )
+                }
+            } else {
+                quote!()
+            };
+            
             variants.push(quote!{
                 class $variant_dart_cls_name extends $dart_cls_name {
-                    $(for field in variant_obj.fields() => final $(&field.as_type().as_renderable().render_type(&field.as_type(), type_helper)) $(DartCodeOracle::var_name(field.name()));  )
+                    $(for (i, field) in variant_obj.fields().iter().enumerate() => final $(field_type(field, type_helper)) $(field_name(field, i));  )
                     
                     // Add the public const constructor
                     $variant_dart_cls_name($constructor_param_list);
 
                     // Keep the private constructor used by `read`
-                    $variant_dart_cls_name._($(for field in variant_obj.fields() => this.$(DartCodeOracle::var_name(field.name())), ));
+                    $variant_dart_cls_name._($(for (i, field) in variant_obj.fields().iter().enumerate() => $(field_type(field, type_helper)) this.$(field_name(field, i)), ));
 
                     static LiftRetVal<$variant_dart_cls_name> read( Uint8List buf) {
                         int new_offset = buf.offsetInBytes;
 
-                        $(for f in variant_obj.fields() =>
-                            final $(DartCodeOracle::var_name(f.name()))_lifted = $(f.as_type().as_codetype().ffi_converter_name()).read(Uint8List.view(buf.buffer, new_offset));
-                            final $(DartCodeOracle::var_name(f.name())) = $(DartCodeOracle::var_name(f.name()))_lifted.value;
-                            new_offset += $(DartCodeOracle::var_name(f.name()))_lifted.bytesRead;
-                        )
+                        $(for code in &field_read_code => $code)
                         return LiftRetVal($variant_dart_cls_name._(
-                            $(for f in variant_obj.fields() => $(DartCodeOracle::var_name(f.name())),)
+                            $(for (i, field) in variant_obj.fields().iter().enumerate() => $(field_name(field, i)),)
                         ), new_offset);
                     }
 
@@ -143,7 +230,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
 
                     @override
                     int allocationSize() {
-                        return $(for f in variant_obj.fields() => $(f.as_type().as_codetype().ffi_converter_name()).allocationSize($(DartCodeOracle::var_name(f.name()))) + ) 4;
+                        return $(for part in &allocation_parts => $part) 4;
                     }
 
                     @override
@@ -151,18 +238,37 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                         buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, $(index + 1)); // write index into first position;
                         int new_offset = buf.offsetInBytes + 4;
 
-                        $(for f in variant_obj.fields() =>
-                        new_offset += $(f.as_type().as_codetype().ffi_converter_name()).write($(DartCodeOracle::var_name(f.name())), Uint8List.view(buf.buffer, new_offset));
-                        )
+                        $(for code in &field_write_code => $code)
 
                         return new_offset;
                     }
+
+                    $to_string_method
                 }
             });
         }
 
-        let implements_exception = if dart_cls_name.ends_with("Exception") {
+        let is_error_enum = type_helper.get_ci().is_name_used_as_error(obj.name());
+        let implements_exception = if is_error_enum {
             quote!( implements Exception)
+        } else {
+            quote!()
+        };
+
+        // For error enums, also generate an error handler
+        let error_handler_class = if is_error_enum {
+            let error_handler_name = format!("{}ErrorHandler", dart_cls_name);
+            let instance_name = dart_cls_name.to_lower_camel_case();
+            quote! {
+                class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
+                    @override
+                    Exception lift(RustBuffer errorBuf) {
+                        return $ffi_converter_name.lift(errorBuf);
+                    }
+                }
+
+                final $(&error_handler_name) $(instance_name)ErrorHandler = $(&error_handler_name)();
+            }
         } else {
             quote!()
         };
@@ -205,6 +311,8 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             }
 
             $(variants)
+
+            $error_handler_class
         }
     }
 }
