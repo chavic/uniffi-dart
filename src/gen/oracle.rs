@@ -70,15 +70,6 @@ impl DartCodeOracle {
     }
 
 
-    /// Helper method to generate external Dart type labels.
-    fn external_type_label(name: &str) -> String {
-        format!("External{}", name.to_upper_camel_case())
-    }
-
-    /// Helper method to generate external native type labels.
-    fn external_native_type_label(name: &str) -> String {
-        format!("Pointer<{}>", Self::external_type_label(name))
-    }
     /// Get the idiomatic Dart rendering of an exception name
     // pub fn error_name(nm: &str) -> String {
     //     let name = Self::class_name(nm);
@@ -223,16 +214,7 @@ impl DartCodeOracle {
     pub fn async_complete(callable: impl Callable, ci: &ComponentInterface) -> dart::Tokens {
         let ffi_func = callable.ffi_rust_future_complete(ci);
         let call = quote!($(Self::find_lib_instance()).$ffi_func);
-        match callable.return_type() {
-            Some(Type::External { .. }) => {
-                // Some(return_type) if ci.is_external(&return_type) => {
-                //     let ffi_type = FfiType::from(return_type);
-                //     match ffi_type {
-                // FfiType::RustBuffer(Some(ExternalFfiMetadata { .. })) => {
-                todo!("Need to convert the RustBuffer from our package to the RustBuffer of the external package")
-            }
-            _ => call,
-        }
+        call
     }
 
     pub fn async_free(callable: impl Callable, ci: &ComponentInterface) -> dart::Tokens {
@@ -274,10 +256,6 @@ impl DartCodeOracle {
                     let key = DartCodeOracle::dart_type_label(Some(key_type));
                     let value = DartCodeOracle::dart_type_label(Some(value_type));
                     quote!(Map<$key, $value>)
-                }
-                Type::External { name, .. } => {
-                    let external_name = &DartCodeOracle::external_type_label(name);
-                    quote!($external_name)
                 }
                 Type::Enum { name, .. } => {
                     let enum_name = &DartCodeOracle::class_name(name);
@@ -325,10 +303,6 @@ impl DartCodeOracle {
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(Int32),
                 Type::Record { .. } => quote!(RustBuffer),
-                Type::External { name, .. } => {
-                    let external_name = &DartCodeOracle::external_native_type_label(name);
-                    quote!($external_name)
-                },
                 Type::Custom { name, .. } => {
                     let class_name = &DartCodeOracle::class_name(name);
                     quote!($class_name)
@@ -367,10 +341,6 @@ impl DartCodeOracle {
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(int),
                 Type::Record { .. } => quote!(RustBuffer),
-                Type::External { name, .. } => {
-                    let external_name = &DartCodeOracle::external_type_label(name);
-                    quote!($external_name)
-                },
                 Type::Custom { name, .. } => {
                     let type_name = &DartCodeOracle::class_name(name);
                     quote!($type_name)
