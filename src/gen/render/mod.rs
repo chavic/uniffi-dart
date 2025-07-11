@@ -32,6 +32,7 @@ pub trait Renderable {
             Type::Float32 | Type::Float64 => quote!(double),
             Type::String => quote!(String),
             Type::Boolean => quote!(bool),
+            Type::Bytes => quote!(Uint8List),
             Type::Object { name, .. } => quote!($name),
             Type::Optional { inner_type } => quote!($(&self.render_type(inner_type, type_helper))?),
             Type::Sequence { inner_type } => {
@@ -81,6 +82,7 @@ impl<T: AsType> AsRenderable for T {
             Type::Boolean => Box::new(primitives::BooleanCodeType),
             Type::String => Box::new(primitives::StringCodeType),
             Type::Duration => Box::new(primitives::DurationCodeType),
+            Type::Bytes => Box::new(primitives::BytesCodeType),
             Type::Object { name, .. } => Box::new(objects::ObjectCodeType::new(name)),
             Type::Optional { inner_type } => Box::new(compounds::OptionalCodeType::new(
                 self.as_type(),
