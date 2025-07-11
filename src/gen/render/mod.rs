@@ -1,4 +1,4 @@
-use super::{callback_interface, compounds, enums, primitives, records};
+use super::{callback_interface, compounds, custom, enums, primitives, records};
 use super::{objects, oracle::AsCodeType};
 use genco::{lang::dart, quote};
 use uniffi_bindgen::interface::{AsType, Enum, Object, Record, Type};
@@ -45,6 +45,7 @@ pub trait Renderable {
             }
             Type::Enum { name, .. } => quote!($name),
             Type::Record { name, .. } => quote!($name),
+            Type::Custom { name, .. } => quote!($name),
             Type::Duration => quote!(Duration),
             Type::CallbackInterface { name, .. } => quote!($name),
             _ => todo!("Type::{:?}", ty),
@@ -91,6 +92,7 @@ impl<T: AsType> AsRenderable for T {
             )),
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
             Type::Record {name, .. } => Box::new(records::RecordCodeType::new(name)),
+            Type::Custom {name, module_path, builtin } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
             Type::CallbackInterface { name, .. } => Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type())),
             _ => todo!("Renderable for Type::{:?}", self.as_type()),
         }
