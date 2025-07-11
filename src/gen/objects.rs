@@ -1,8 +1,8 @@
 use genco::prelude::*;
 use crate::gen::callback_interface::{generate_callback_functions, generate_callback_interface, generate_callback_interface_vtable_init_function, generate_callback_vtable_interface};
 use crate::gen::CodeType;
-use uniffi_bindgen::backend::{Literal, Type};
-use uniffi_bindgen::interface::{Argument, AsType, Method, Object, ObjectImpl};
+use uniffi_bindgen::backend::Literal;
+use uniffi_bindgen::interface::{AsType, Method, Object, ObjectImpl};
 
 use crate::gen::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::AsRenderable;
@@ -145,8 +145,29 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
                 return $cls_name._(ptr);
             }
 
+            static Pointer<Void> lower($cls_name value) {
+                return value.uniffiClonePointer();
+            }
+
             Pointer<Void> uniffiClonePointer() {
                 return rustCall((status) => $lib_instance.$ffi_object_clone_name(_ptr, status));
+            }
+
+            // A Rust pointer is 8 bytes
+            static int allocationSize($cls_name value) {
+                return 8;
+            }
+
+            static LiftRetVal<$cls_name> read(Uint8List buf) {
+                final handle = buf.buffer.asByteData(buf.offsetInBytes).getInt64(0);
+                final pointer = Pointer<Void>.fromAddress(handle);
+                return LiftRetVal($cls_name.lift(pointer), 8);
+            }
+
+            static int write($cls_name value, Uint8List buf) {
+                final handle = lower(value);
+                buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
+                return 8;
             }
 
             void dispose() {
@@ -175,13 +196,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         (quote!(void), quote!((_) {}))
     };
 
-    fn lower_arg(arg: &Argument) -> dart::Tokens {
-        let lower_arg = DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name())))); 
-        match arg.as_type() {
-            Type::Object { imp, .. } if imp == ObjectImpl::CallbackTrait => quote!(Pointer<Void>.fromAddress($(lower_arg))),
-            _ => lower_arg
-        }
-    }
+    // Use centralized callback-aware argument lowering
 
     if func.is_async() {
         quote!(
@@ -189,7 +204,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                 return uniffiRustCallAsync(
                   () => $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                     uniffiClonePointer(),
-                    $(for arg in &func.arguments() => $(lower_arg(arg)),)
+                    $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),)
                   ),
                   $(DartCodeOracle::async_poll(func, type_helper.get_ci())),
                   $(DartCodeOracle::async_complete(func, type_helper.get_ci())),
@@ -206,7 +221,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                     return rustCall((status) {
                         $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                             uniffiClonePointer(),
-                            $(for arg in &func.arguments() => $(lower_arg(arg)),) status
+                            $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                         );
                     });
                 }
@@ -216,7 +231,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
                 $ret $(DartCodeOracle::fn_name(func.name()))($args) {
                     return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
-                        $(for arg in &func.arguments() => $(lower_arg(arg)),) status
+                        $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                     )));
                 }
             )

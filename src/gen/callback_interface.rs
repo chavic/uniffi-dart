@@ -7,6 +7,7 @@ use crate::gen::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::AsRenderable;
 use crate::gen::render::{Renderable, TypeHelperRenderer};
 
+// Removed problematic context structure - will implement simpler improvements
 
 #[derive(Debug)]
 pub struct CallbackInterfaceCodeType {
@@ -43,7 +44,9 @@ impl Renderable for CallbackInterfaceCodeType {
         let interface = generate_callback_interface(callback.name(), &callback.as_codetype().ffi_converter_name(), &callback.methods(), type_helper);
         let vtable_interface = generate_callback_vtable_interface(callback.name(), &callback.methods());
         let functions = generate_callback_functions(callback.name(), &callback.methods(), type_helper);
-        let vtable_init = generate_callback_interface_vtable_init_function(callback.name(), &callback.methods(), "callbacks");
+        let namespace = type_helper.get_ci().namespace_for_type(&callback.as_type())
+            .unwrap_or_else(|_| type_helper.get_ci().namespace());
+        let vtable_init = generate_callback_interface_vtable_init_function(callback.name(), &callback.methods(), namespace);
         
         quote! {
             $interface
@@ -62,6 +65,7 @@ pub fn generate_callback_interface(
 ) -> dart::Tokens {
     let cls_name = &DartCodeOracle::class_name(callback_name);
     let ffi_conv_name = &DartCodeOracle::class_name(ffi_converter_name);
+    let init_fn_name = &format!("init{}VTable", callback_name);
 
     let tokens = quote! {
         // This is the abstract class to be implemented
@@ -74,13 +78,22 @@ pub fn generate_callback_interface(
         // This is the type helper to convert from FFI to Dart
         class $ffi_conv_name {
             static final _handleMap = UniffiHandleMap<$cls_name>();
+            static bool _vtableInitialized = false;
 
             static $cls_name lift(int handle) {
                 return _handleMap.get(handle);
             }
             
             static int lower($cls_name value) {
+                _ensureVTableInitialized();
                 return _handleMap.insert(value);
+            }
+
+            static void _ensureVTableInitialized() {
+                if (!_vtableInitialized) {
+                    $init_fn_name();
+                    _vtableInitialized = true;
+                }
             }
         
             static LiftRetVal<$cls_name> read(Uint8List buf) {
@@ -269,6 +282,11 @@ pub fn generate_callback_interface_vtable_init_function(callback_name: &str, met
         late final Pointer<$vtable_name> $(&vtable_static_instance_name);
 
         void $init_fn_name() {
+            // Make initialization idempotent - return early if already initialized
+            if (FfiConverterCallbackInterface$(DartCodeOracle::class_name(callback_name))._vtableInitialized) {
+                return;
+            }
+
             $(&vtable_static_instance_name) = calloc<$vtable_name>();
             $(for m in methods {
                 $(&vtable_static_instance_name).ref.$(DartCodeOracle::fn_name(m.name())) = $(DartCodeOracle::fn_name(callback_name))$(DartCodeOracle::class_name(m.name()))Pointer;
@@ -281,6 +299,9 @@ pub fn generate_callback_interface_vtable_init_function(callback_name: &str, met
                 );
                 checkCallStatus(NullRustCallStatusErrorHandler(), status);
             });
+
+            // Update the flag to prevent re-initialization
+            FfiConverterCallbackInterface$(DartCodeOracle::class_name(callback_name))._vtableInitialized = true;
         }
     }
 }
