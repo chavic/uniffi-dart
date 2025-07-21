@@ -4,9 +4,6 @@ import '../metadata.dart';
 void main() {
   group('Metadata', () {
     test('basic metadata functionality', () {
-      // This test will fail until metadata support is implemented
-      // Expected: Metadata should be properly generated and accessible
-
       testMetadata();
 
       final metadataStruct = getMetadataStruct();
@@ -16,10 +13,7 @@ void main() {
       expect(metadataStruct.features, contains('testing'));
     });
 
-    test('metadata object functionality', () {
-      // This test will fail until metadata support is implemented
-      // Expected: Objects should have proper metadata information
-
+        test('metadata object functionality', () {
       final obj = MetadataObject('test-object');
       expect(obj.getName(), equals('test-object'));
       expect(obj.getVersion(), equals(0));
@@ -28,10 +22,7 @@ void main() {
       // Note: In real implementation, this should update the version
     });
 
-    test('metadata enum functionality', () {
-      // This test will fail until metadata support is implemented
-      // Expected: Enums should have proper metadata information
-
+        test('metadata enum functionality', () {
       final basicType = MetadataType.basic;
       expect(basicType, equals(MetadataType.basic));
 
