@@ -4,4 +4,4 @@ mod tests {
     fn test_metadata() {
         uniffi_dart::testing::run_test("metadata", None).unwrap();
     }
-} 
+}

@@ -4,4 +4,4 @@ mod tests {
     fn test_time_types() {
         uniffi_dart::testing::run_test("time_types", None).unwrap();
     }
-} 
+}

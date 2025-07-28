@@ -99,4 +99,4 @@ pub fn get_animal(a: Option<Animal>) -> Animal {
     a.unwrap_or(Animal::Dog)
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

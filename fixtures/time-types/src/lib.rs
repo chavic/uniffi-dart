@@ -70,4 +70,4 @@ fn set_seconds_before_unix_epoch(seconds: u64) -> Result<SystemTime> {
 
 type Result<T, E = ChronologicalError> = std::result::Result<T, E>;
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

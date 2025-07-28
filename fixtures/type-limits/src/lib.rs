@@ -49,4 +49,4 @@ fn take_bytes(v: Vec<u8>) -> Vec<u8> {
     v
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

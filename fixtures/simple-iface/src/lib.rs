@@ -23,4 +23,4 @@ pub fn make_object(inner: i32) -> Arc<Object> {
     Arc::new(Object::new(inner))
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

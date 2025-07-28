@@ -15,4 +15,4 @@ pub trait TestCallbackInterface: Send + Sync {
 #[uniffi::export(with_foreign)]
 pub trait OtherCallbackInterface: Send + Sync {
     fn multiply(&self, a: i32, b: i32) -> i32;
-} 
+}

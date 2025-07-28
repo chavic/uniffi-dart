@@ -158,4 +158,4 @@ fn get_externals(e: Option<Externals>) -> Externals {
     e.unwrap_or_default()
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

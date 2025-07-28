@@ -109,4 +109,4 @@ pub trait CallbackTest {
 #[uniffi::export]
 pub fn test_long_docstring() {}
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

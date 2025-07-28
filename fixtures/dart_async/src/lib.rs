@@ -230,7 +230,7 @@ pub struct Megaphone;
 
 #[uniffi::export]
 impl Megaphone {
-    /// Async constructor 
+    /// Async constructor
     #[uniffi::constructor]
     pub async fn new() -> Arc<Self> {
         TimerFuture::new(Duration::from_millis(0)).await;

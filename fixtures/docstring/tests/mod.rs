@@ -4,4 +4,4 @@ mod tests {
     fn test_docstring() {
         uniffi_dart::testing::run_test("docstring", None).unwrap();
     }
-} 
+}

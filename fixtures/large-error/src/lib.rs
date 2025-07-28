@@ -98,4 +98,4 @@ pub fn error_code_from_error(error: &LargeError) -> u32 {
     error.discriminant()
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

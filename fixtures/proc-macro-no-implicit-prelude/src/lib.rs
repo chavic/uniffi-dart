@@ -410,4 +410,4 @@ impl ObjectWithDefaults {
     }
 }
 
-::uniffi::include_scaffolding!("api"); 
+::uniffi::include_scaffolding!("api");

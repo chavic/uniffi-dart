@@ -59,4 +59,4 @@ impl MyHashSet {
     }
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

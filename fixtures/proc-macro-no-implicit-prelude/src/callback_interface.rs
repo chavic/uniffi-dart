@@ -21,4 +21,4 @@ pub trait TestCallbackInterface {
 #[::uniffi::export(callback_interface)]
 pub trait OtherCallbackInterface {
     fn multiply(&self, a: u32, b: u32) -> u32;
-} 
+}

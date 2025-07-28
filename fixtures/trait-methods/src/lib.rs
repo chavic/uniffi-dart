@@ -37,4 +37,4 @@ impl std::fmt::Display for ProcTraitMethods {
     }
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

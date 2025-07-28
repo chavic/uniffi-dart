@@ -63,4 +63,4 @@ pub trait CallbackTest: Send + Sync {
     fn test(&self);
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

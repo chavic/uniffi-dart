@@ -6,4 +6,4 @@ pub struct Bookmark {
     pub title: Option<String>,
 }
 
-uniffi::include_scaffolding!("api"); 
+uniffi::include_scaffolding!("api");

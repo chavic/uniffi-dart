@@ -41,7 +41,6 @@ pub fn fibonacci_stream() -> Pin<Box<dyn Stream<Item = u64> + Send>> {
     })
 }
 
-
 #[uniffi_dart::export_stream(u64)]
 pub fn async_timer_stream() -> Pin<Box<dyn Stream<Item = u64> + Send>> {
     Box::pin(stream! {
@@ -312,7 +311,6 @@ mod tests {
     //         Err(_) => panic!("Timeout occurred while collecting error stream"),
     //     }
     // }
-
 
     // #[tokio::test]
     // async fn test_combined_error_streams_handling() {
