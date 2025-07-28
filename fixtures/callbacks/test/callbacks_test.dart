@@ -75,7 +75,7 @@ void main() {
     final flag = true;
     for (final v in [
       [1, 2],
-      [0, 1]
+      [0, 1],
     ]) {
       final expected = callback.getList(v, flag);
       final observed = rustGetters.getList(callback, v, flag);
@@ -103,11 +103,14 @@ void main() {
 
   test('getStringOptionalCallback works', () {
     expect(
-        rustGetters.getStringOptionalCallback(callback, "1234567890123", false),
-        equals("1234567890123"));
+      rustGetters.getStringOptionalCallback(callback, "1234567890123", false),
+      equals("1234567890123"),
+    );
     // Passing null as the callback
-    expect(rustGetters.getStringOptionalCallback(null, "1234567890123", false),
-        isNull);
+    expect(
+      rustGetters.getStringOptionalCallback(null, "1234567890123", false),
+      isNull,
+    );
   });
 
   test('getNothing should not throw with normal argument', () {

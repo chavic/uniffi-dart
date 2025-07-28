@@ -1,7 +1,7 @@
+use crate::gen::CodeType;
 use genco::lang::dart;
 use genco::prelude::*;
 use paste::paste;
-use crate::gen::CodeType;
 use uniffi_bindgen::interface::Type;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
@@ -68,7 +68,7 @@ macro_rules! impl_renderable_for_compound {
                                 if (ByteData.view(buf.buffer, buf.offsetInBytes).getInt8(0) == 0){
                                     return LiftRetVal(null, 1);
                                 }
-                                final result = $inner_cl_converter_name.read(Uint8List.view(buf.buffer, buf.offsetInBytes + 1)); 
+                                final result = $inner_cl_converter_name.read(Uint8List.view(buf.buffer, buf.offsetInBytes + 1));
                                 return LiftRetVal<$type_label>(result.value, result.bytesRead + 1);
                             }
 

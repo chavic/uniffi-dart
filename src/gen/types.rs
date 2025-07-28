@@ -5,8 +5,7 @@ use genco::prelude::*;
 use uniffi_bindgen::interface::AsType;
 use uniffi_bindgen::{interface::Type, ComponentInterface};
 
-
-use super::render::{AsRenderable, Renderer, TypeHelperRenderer, Renderable};
+use super::render::{AsRenderable, Renderable, Renderer, TypeHelperRenderer};
 use super::{enums, functions, objects, oracle::AsCodeType, records};
 use crate::gen::oracle::DartCodeOracle;
 
@@ -77,8 +76,14 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
         };
 
         // Render all unique imports, sorted alphabetically
-        let modules_to_import = self.ci.iter_external_types()
-            .map(|ty| self.ci.namespace_for_type(ty).expect("external type should have module_path"))
+        let modules_to_import = self
+            .ci
+            .iter_external_types()
+            .map(|ty| {
+                self.ci
+                    .namespace_for_type(ty)
+                    .expect("external type should have module_path")
+            })
             .collect::<BTreeSet<_>>();
         // The second import statement uses a library prefix, to distinguish conflicting identifiers e.g. RustBuffer vs. ext.RustBuffer
         let imports: dart::Tokens = quote!(
@@ -91,9 +96,9 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
         // let function_definitions = quote!($( for fun in self.ci.function_definitions() => $(functions::generate_function("this", fun, self))));
 
         let function_definitions = quote!(
-            $(for fun in self.ci.function_definitions() => 
+            $(for fun in self.ci.function_definitions() =>
                 $(functions::generate_function(fun, self))
-                
+
             )
         );
 
@@ -101,7 +106,10 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
         // Process all callback interfaces to ensure they're included
         for callback in self.ci.callback_interface_definitions() {
             let callback_name = callback.name().to_string();
-            let callback_codetype = super::callback_interface::CallbackInterfaceCodeType::new(callback_name, callback.as_type());
+            let callback_codetype = super::callback_interface::CallbackInterfaceCodeType::new(
+                callback_name,
+                callback.as_type(),
+            );
             // Force the callback interface to be processed, due to the way the code is generated we need to ensure it's processed, when a callback is used in a function signature
             // TODO: This is a hack to ensure the callback interface is processed, we need to test to ensure there's no chance of duplicates
             callback_code.append(callback_codetype.render_type_helper(self));
@@ -405,13 +413,13 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             class UniffiHandleMap<T> {
                 final Map<int, T> _map = {};
                 int _counter = 0;
-            
+
                 int insert(T obj) {
                 final handle = _counter++;
                 _map[handle] = obj;
                 return handle;
                 }
-            
+
                 T get(int handle) {
                 final obj = _map[handle];
                 if (obj == null) {
@@ -420,7 +428,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 }
                 return obj;
                 }
-            
+
                 void remove(int handle) {
                 if (_map.remove(handle) == null) {
                     throw UniffiInternalError(

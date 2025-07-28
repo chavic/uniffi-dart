@@ -1,10 +1,13 @@
 use genco::prelude::*;
 use std::fmt::Debug;
 
-use std::string::ToString;
-use heck::ToLowerCamelCase;
-use crate::gen::callback_interface::{generate_callback_functions, generate_callback_interface, generate_callback_interface_vtable_init_function, generate_callback_vtable_interface};
+use crate::gen::callback_interface::{
+    generate_callback_functions, generate_callback_interface,
+    generate_callback_interface_vtable_init_function, generate_callback_vtable_interface,
+};
 use crate::gen::CodeType;
+use heck::ToLowerCamelCase;
+use std::string::ToString;
 use uniffi_bindgen::backend::Literal;
 use uniffi_bindgen::interface::{AsType, Method, Object, ObjectImpl};
 
@@ -63,24 +66,32 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     type_helper.include_once_check(obj.name(), &obj.as_type());
 
     if obj.has_callback_interface() {
-        let interface = generate_callback_interface(obj.name(), &obj.as_codetype().ffi_converter_name(), &obj.methods(), type_helper);
+        let interface = generate_callback_interface(
+            obj.name(),
+            &obj.as_codetype().ffi_converter_name(),
+            &obj.methods(),
+            type_helper,
+        );
         let vtable_interface = generate_callback_vtable_interface(obj.name(), &obj.methods());
         let functions = generate_callback_functions(obj.name(), &obj.methods(), type_helper);
         let vtable_init = generate_callback_interface_vtable_init_function(
             obj.name(),
             &obj.methods(),
-            type_helper.get_ci().namespace_for_type(&obj.as_type()).expect("object should have namespace")
+            type_helper
+                .get_ci()
+                .namespace_for_type(&obj.as_type())
+                .expect("object should have namespace"),
         );
         return quote!(
             $interface
             $vtable_interface
             $functions
             $vtable_init
-        )
+        );
     }
 
     let cls_name = &DartCodeOracle::class_name(obj.name());
-    let finalizer_cls_name = &format!("{}Finalizer", cls_name);
+    let finalizer_cls_name = &format!("{cls_name}Finalizer");
     let lib_instance = &DartCodeOracle::find_lib_instance();
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
@@ -92,7 +103,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     } else {
         quote!()
     };
-    
+
     let constructor_definitions = obj.constructors().into_iter().map(|constructor| {
         let ffi_func_name = constructor.ffi_func().name();
         let constructor_name = constructor.name();
@@ -102,7 +113,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         } else {
             quote!($cls_name.$(DartCodeOracle::fn_name(constructor_name)))
         };
-        
+
         // Check if function can throw errors
         let error_handler = if let Some(error_type) = constructor.throws_type() {
             let error_name = DartCodeOracle::class_name(error_type.name().unwrap_or("UnknownError"));
@@ -118,9 +129,9 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         ));
 
         let ffi_call_args = quote!($(for arg in constructor.arguments() =>
-            $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),) 
+            $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),)
         );
-        
+
         // Ensure argument types are included
         for arg in constructor.arguments() {
             type_helper.include_once_check(&arg.as_codetype().canonical_name(), &arg.as_type());
@@ -141,10 +152,10 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
 
     // For interface objects that are used as error types, generate error handlers
     let is_error_interface = type_helper.get_ci().is_name_used_as_error(obj.name());
-    
+
     let error_handler_class = if is_error_interface {
         // Generate error handlers for specific error interfaces
-        let error_handler_name = format!("{}ErrorHandler", cls_name);
+        let error_handler_name = format!("{cls_name}ErrorHandler");
         let instance_name = cls_name.to_lower_camel_case();
         quote! {
             class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
@@ -166,11 +177,10 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         quote!()
     };
 
-    
     // Generate toString() method for error interfaces
     let to_string_method: dart::Tokens = if is_error_interface && !obj.is_trait_interface() {
         // Only generate toString for regular error interfaces, skip trait interfaces for now
-        let dart_class_name = format!("\"{}\"", cls_name);
+        let dart_class_name = format!("\"{cls_name}\"");
         quote! {
             @override
             String toString() {
@@ -284,27 +294,25 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
             }
 
         )
-    } else {
-        if ret == quote!(void) {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) {
-                        $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
-                            uniffiClonePointer(),
-                            $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                        );
-                    }, $error_handler);
-                }
-            )
-        } else {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+    } else if ret == quote!(void) {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) {
+                    $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                    )), $error_handler);
-                }
-            )
-      }
+                    );
+                }, $error_handler);
+            }
+        )
+    } else {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+                    uniffiClonePointer(),
+                    $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
+                )), $error_handler);
+            }
+        )
     }
 }

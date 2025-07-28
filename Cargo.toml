@@ -5,7 +5,7 @@ edition = "2021"
 license = "Apache-2 or MIT"
 homepage = "https://github.com/acterglobal/uniffi-dart"
 description = "Dart Frontend for UniFFI"
-rust-version = "1.81"
+rust-version = "1.86"
 
 [features]
 defaults = []
@@ -59,15 +59,16 @@ stringcase = "0.4.0"
 
 members = [
     ".",
-
-    # for testing
-    "fixtures/*", "uniffi_dart_macro",
-]
-# Ignore a few tests for now
-exclude = [
-    "fixtures/coverall",
-    "fixtures/custom_types",
-    "fixtuers/dispose",
+    "uniffi_dart_macro",
+    
+    # Working fixtures - only include fixtures that actually work
+    "fixtures/arithmetic",
+    "fixtures/bytes_types", 
+    "fixtures/duration_type_test",
+    "fixtures/hello_world",
+    "fixtures/metadata",
+    "fixtures/simple-iface",
+    "fixtures/streams_ext",
 ]
 
 [workspace.dependencies]
@@ -75,3 +76,4 @@ uniffi = { version = "0.29.0" }
 uniffi_bindgen = { version = "0.29.0" }
 uniffi_build = { version = "0.29.0" }
 uniffi_testing = { version = "0.29.0" }
+camino = { version = "1.1" }

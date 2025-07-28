@@ -68,8 +68,6 @@ impl Config {
     }
 }
 
-
-
 pub struct DartWrapper<'a> {
     config: &'a Config,
     ci: &'a ComponentInterface,
@@ -153,7 +151,7 @@ impl<'a> DartWrapper<'a> {
             library $package_name;
 
             $(type_helper_code) // Imports, Types and Type Helper
-            
+
             $(functions_definitions)
 
             class _UniffiLib {
@@ -214,9 +212,7 @@ impl BindingGenerator for DartBindingGenerator {
         components: &[uniffi_bindgen::Component<Self::Config>],
     ) -> Result<()> {
         for Component { ci, config, .. } in components {
-            let filename = settings
-                .out_dir
-                .join(format!("{}.dart", ci.namespace()));
+            let filename = settings.out_dir.join(format!("{}.dart", ci.namespace()));
             let tokens = DartWrapper::new(ci, config).generate();
             let file = std::fs::File::create(filename)?;
 
@@ -259,16 +255,14 @@ impl BindingGenerator for DartBindingGenerator {
     }
 }
 
-
 pub struct LocalConfigSupplier(String);
 impl BindgenCrateConfigSupplier for LocalConfigSupplier {
-
     fn get_udl(&self, _crate_name: &str, _udl_name: &str) -> Result<String> {
         let file = std::fs::File::open(self.0.clone())?;
         let mut reader = std::io::BufReader::new(file);
         let mut content = String::new();
         reader.read_to_string(&mut content)?;
-        return Ok(content);
+        Ok(content)
     }
 }
 
@@ -293,12 +287,12 @@ pub fn generate_dart_bindings(
     } else {
         uniffi_bindgen::generate_external_bindings(
             &DartBindingGenerator {},
-        udl_file,
-        config_file_override,
-        out_dir_override,
-        Some(library_file),
-        None,
-        true,
+            udl_file,
+            config_file_override,
+            out_dir_override,
+            Some(library_file),
+            None,
+            true,
         )
     }
 }

@@ -3,8 +3,8 @@ use crate::gen::{
     render::{Renderable, TypeHelperRenderer},
 };
 
-use genco::lang::dart;
 use crate::gen::CodeType;
+use genco::lang::dart;
 
 #[derive(Debug)]
 pub struct StringCodeType;

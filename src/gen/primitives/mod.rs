@@ -28,27 +28,27 @@ fn render_literal(literal: &Literal) -> String {
             | Type::Float32
             | Type::Float64
             | Type::Duration => num_str,
-            _ => panic!("Unexpected literal: {} is not a number", num_str),
+            _ => panic!("Unexpected literal: {num_str} is not a number"),
         }
     }
 
     match literal {
-        Literal::Boolean(v) => format!("{}", v),
-        Literal::String(s) => format!("'{}'", s),
+        Literal::Boolean(v) => format!("{v}"),
+        Literal::String(s) => format!("'{s}'"),
         Literal::Int(i, radix, type_) => typed_number(
             type_,
             match radix {
-                Radix::Octal => format!("{:#x}", i),
-                Radix::Decimal => format!("{}", i),
-                Radix::Hexadecimal => format!("{:#x}", i),
+                Radix::Octal => format!("{i:#x}"),
+                Radix::Decimal => format!("{i}"),
+                Radix::Hexadecimal => format!("{i:#x}"),
             },
         ),
         Literal::UInt(i, radix, type_) => typed_number(
             type_,
             match radix {
-                Radix::Octal => format!("{:#x}", i),
-                Radix::Decimal => format!("{}", i),
-                Radix::Hexadecimal => format!("{:#x}", i),
+                Radix::Octal => format!("{i:#x}"),
+                Radix::Decimal => format!("{i}"),
+                Radix::Hexadecimal => format!("{i:#x}"),
             },
         ),
         Literal::Float(string, type_) => typed_number(type_, string.clone()),

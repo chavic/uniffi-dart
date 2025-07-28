@@ -1,0 +1,17 @@
+[package]
+name = "docstring"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "docstring"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+thiserror = "1.0"
+uniffi = "0.29"
+uniffi-dart = { path = "../../", features = ["bindgen-tests"] }
+
+[build-dependencies]
+uniffi-dart = { path = "../../", features = ["build"] }
+camino = { workspace = true } 

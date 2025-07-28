@@ -21,7 +21,7 @@ pub trait TypeHelperRenderer {
 pub trait Renderable {
     fn render_type(&self, ty: &Type, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
         use super::oracle::DartCodeOracle;
-        
+
         let type_name = match ty {
             Type::UInt8
             | Type::Int8
@@ -95,9 +95,15 @@ impl<T: AsType> AsRenderable for T {
                 *inner_type,
             )),
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
-            Type::Record {name, .. } => Box::new(records::RecordCodeType::new(name)),
-            Type::Custom {name, module_path, builtin } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
-            Type::CallbackInterface { name, .. } => Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type())),
+            Type::Record { name, .. } => Box::new(records::RecordCodeType::new(name)),
+            Type::Custom {
+                name,
+                module_path,
+                builtin,
+            } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
+            Type::CallbackInterface { name, .. } => Box::new(
+                callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()),
+            ),
             _ => todo!("Renderable for Type::{:?}", self.as_type()),
         }
     }

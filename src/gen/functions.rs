@@ -1,6 +1,6 @@
 use genco::prelude::*;
-use uniffi_bindgen::interface::{AsType, Function};
 use heck::ToLowerCamelCase;
+use uniffi_bindgen::interface::{AsType, Function};
 
 use crate::gen::oracle::DartCodeOracle;
 use crate::gen::render::AsRenderable;
@@ -46,25 +46,23 @@ pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) 
                 );
             }
         )
-    } else {
-        if ret == quote!(void) {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) {
-                        $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
-                            $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                        );
-                    }, $error_handler);
-                }
-            )
-        } else {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+    } else if ret == quote!(void) {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) {
+                    $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                    )), $error_handler);
-                }
-            )
-        }
+                    );
+                }, $error_handler);
+            }
+        )
+    } else {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+                    $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
+                )), $error_handler);
+            }
+        )
     }
 }

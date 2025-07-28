@@ -1,8 +1,8 @@
-use genco::prelude::*;
 use crate::gen::CodeType;
+use genco::prelude::*;
+use heck::ToLowerCamelCase;
 use uniffi_bindgen::backend::Literal;
 use uniffi_bindgen::interface::{AsType, Enum, Field, Type};
-use heck::ToLowerCamelCase;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
 use super::render::{AsRenderable, Renderable, TypeHelperRenderer};
@@ -57,7 +57,6 @@ impl Renderable for EnumCodeType {
 }
 
 pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
-
     let dart_cls_name = &DartCodeOracle::class_name(obj.name());
     let ffi_converter_name = &obj.as_codetype().ffi_converter_name();
     if obj.is_flat() {
@@ -91,13 +90,27 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
 
         // helper functions to get the sanitized field name and type strings
         fn field_name(field: &Field, field_num: usize) -> String {
-            if field.name().is_empty() { format!("v{}", field_num) } else { DartCodeOracle::var_name(field.name()) }
+            if field.name().is_empty() {
+                format!("v{field_num}")
+            } else {
+                DartCodeOracle::var_name(field.name())
+            }
         }
         fn field_type(field: &Field, type_helper: &dyn TypeHelperRenderer) -> String {
-            field.as_type().as_renderable().render_type(&field.as_type(), type_helper).to_string().expect("Could not stringify type").replace("Error", "Exception")
+            field
+                .as_type()
+                .as_renderable()
+                .render_type(&field.as_type(), type_helper)
+                .to_string()
+                .expect("Could not stringify type")
+                .replace("Error", "Exception")
         }
         fn field_ffi_converter_name(field: &Field) -> String {
-            field.as_type().as_codetype().ffi_converter_name().replace("Error", "Exception")
+            field
+                .as_type()
+                .as_codetype()
+                .ffi_converter_name()
+                .replace("Error", "Exception")
         }
         fn is_flat_enum(field: &Field, type_helper: &dyn TypeHelperRenderer) -> bool {
             if let Type::Enum { name, .. } = &field.as_type() {
@@ -112,25 +125,34 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             for f in variant_obj.fields() {
                 type_helper.include_once_check(&f.as_codetype().canonical_name(), &f.as_type());
             }
-            let variant_dart_cls_name = &format!("{}{}", DartCodeOracle::class_name(variant_obj.name()), dart_cls_name);
-            
+            let variant_dart_cls_name = &format!(
+                "{}{}",
+                DartCodeOracle::class_name(variant_obj.name()),
+                dart_cls_name
+            );
+
             // Prepare constructor parameters
-            let constructor_params = variant_obj.fields().iter().enumerate().map(|(i, field)| {
-                let param_name = field_name(field, i);
-                let param_type = field_type(field, type_helper);
-                if variant_obj.fields().len() > 1 {
-                    quote!(required $param_type this.$param_name)
-                } else {
-                    quote!($param_type this.$param_name)
-                }
-            }).collect::<Vec<_>>();
-            
+            let constructor_params = variant_obj
+                .fields()
+                .iter()
+                .enumerate()
+                .map(|(i, field)| {
+                    let param_name = field_name(field, i);
+                    let param_type = field_type(field, type_helper);
+                    if variant_obj.fields().len() > 1 {
+                        quote!(required $param_type this.$param_name)
+                    } else {
+                        quote!($param_type this.$param_name)
+                    }
+                })
+                .collect::<Vec<_>>();
+
             let constructor_param_list = if variant_obj.fields().len() > 1 {
                 quote!({ $( for p in constructor_params => $p, ) })
             } else {
                 quote!($( for p in constructor_params => $p, ))
             };
-            
+
             // Pre-process field reading code
             let field_read_code: Vec<dart::Tokens> = variant_obj.fields().iter().enumerate().map(|(i, field)| {
                 if is_flat_enum(field, type_helper) {
@@ -176,36 +198,40 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             }).collect();
 
             // Generate simple toString() method for error enum variants
-            let to_string_method: dart::Tokens = if type_helper.get_ci().is_name_used_as_error(obj.name()) {
-                if variant_obj.has_fields() {
-                    let field_interpolations = variant_obj.fields().iter()
-                        .enumerate()
-                        .map(|(i, field)| format!("${}", field_name(field, i)))
-                        .collect::<Vec<_>>()
-                        .join(", ");
-                    let to_string_with_fields = format!("\"{}({})\"", variant_dart_cls_name, field_interpolations );
-                    quote!(
-                        @override
-                        String toString() {
-                            return $(&to_string_with_fields);
-                        }
-                    )
+            let to_string_method: dart::Tokens =
+                if type_helper.get_ci().is_name_used_as_error(obj.name()) {
+                    if variant_obj.has_fields() {
+                        let field_interpolations = variant_obj
+                            .fields()
+                            .iter()
+                            .enumerate()
+                            .map(|(i, field)| format!("${}", field_name(field, i)))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        let to_string_with_fields =
+                            format!("\"{variant_dart_cls_name}({field_interpolations})\"");
+                        quote!(
+                            @override
+                            String toString() {
+                                return $(&to_string_with_fields);
+                            }
+                        )
+                    } else {
+                        quote!(
+                            @override
+                            String toString() {
+                                return $(format!("\"{}\"", variant_dart_cls_name));
+                            }
+                        )
+                    }
                 } else {
-                    quote!(
-                        @override
-                        String toString() {
-                            return $(format!("\"{}\"", variant_dart_cls_name));
-                        }
-                    )
-                }
-            } else {
-                quote!()
-            };
-            
+                    quote!()
+                };
+
             variants.push(quote!{
                 class $variant_dart_cls_name extends $dart_cls_name {
                     $(for (i, field) in variant_obj.fields().iter().enumerate() => final $(field_type(field, type_helper)) $(field_name(field, i));  )
-                    
+
                     // Add the public const constructor
                     $variant_dart_cls_name($constructor_param_list);
 
@@ -257,7 +283,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
 
         // For error enums, also generate an error handler
         let error_handler_class = if is_error_enum {
-            let error_handler_name = format!("{}ErrorHandler", dart_cls_name);
+            let error_handler_name = format!("{dart_cls_name}ErrorHandler");
             let instance_name = dart_cls_name.to_lower_camel_case();
             quote! {
                 class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
