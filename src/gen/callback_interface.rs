@@ -228,7 +228,7 @@ pub fn generate_callback_functions(
     let cls_name = &DartCodeOracle::class_name(callback_name);
 
     let functions: Vec<dart::Tokens> = methods.iter().enumerate().map(|(index, m)| {
-        let method_name = &(&DartCodeOracle::fn_name(m.name())).to_string();
+        let method_name = &DartCodeOracle::fn_name(m.name()).to_string();
         let ffi_method_type = &format!("UniffiCallbackInterface{callback_name}Method{index}");
         let _dart_method_type = &format!("UniffiCallbackInterface{callback_name}Method{index}Dart");
 
