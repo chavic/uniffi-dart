@@ -77,7 +77,7 @@ impl DartCodeOracle {
         format!("Uniffi{}", name.to_upper_camel_case())
     }
 
-    /// Get the idiomatic Dart rendering of an exception name
+    ///// Get the idiomatic Dart rendering of an exception name
     // pub fn error_name(nm: &str) -> String {
     //     let name = Self::class_name(nm);
     //     match name.strip_suffix("Error") {
