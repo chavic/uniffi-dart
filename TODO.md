@@ -75,6 +75,11 @@ In this codebase, rendering Dart language bindings directly from Rust should inv
   - **Gap**: Dart FFI layer needs `BigInt` conversion for large u64 values
   - **Status**: Edge case handling
 
+- [ ] **GitHub Actions Cache** - Re-enable Cargo caching when service is stable
+  - **Impact**: CI builds run slower without caching  
+  - **Issue**: FrancisRussell/ferrous-actions cache responds with 400 errors
+  - **Status**: Temporarily disabled, check GitHub service status later
+
 - [ ] **Other Types**:
   - [ ] Bytes/Binary Data
   - [ ] Timestamp
