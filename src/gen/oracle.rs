@@ -580,7 +580,10 @@ impl DartCodeOracle {
     pub fn lower_arg_with_callback_handling(arg: &Argument) -> dart::Tokens {
         let base_lower = Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name()))));
         match arg.as_type() {
-            Type::Object { imp: ObjectImpl::CallbackTrait, .. } => {
+            Type::Object {
+                imp: ObjectImpl::CallbackTrait,
+                ..
+            } => {
                 quote!(Pointer<Void>.fromAddress($(base_lower)))
             }
             _ => base_lower,
