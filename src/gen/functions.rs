@@ -1,6 +1,6 @@
 use genco::prelude::*;
-use uniffi_bindgen::interface::{AsType, Function};
 use heck::ToLowerCamelCase;
+use uniffi_bindgen::interface::{AsType, Function};
 
 use crate::gen::oracle::DartCodeOracle;
 use crate::gen::render::AsRenderable;

@@ -1,6 +1,6 @@
 use super::oracle::{AsCodeType, DartCodeOracle};
-use super::CodeType;
 use super::render::{Renderable, TypeHelperRenderer};
+use super::CodeType;
 use genco::prelude::*;
 use uniffi_bindgen::backend::Type;
 use uniffi_bindgen::interface::AsType;
@@ -14,7 +14,11 @@ pub struct CustomCodeType {
 
 impl CustomCodeType {
     pub fn new(name: String, module_path: String, builtin: Box<Type>) -> Self {
-        CustomCodeType { name, module_path, builtin }
+        CustomCodeType {
+            name,
+            module_path,
+            builtin,
+        }
     }
 }
 

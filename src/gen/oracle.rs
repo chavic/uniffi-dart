@@ -4,7 +4,6 @@ use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::interface::ffi::ExternalFfiMetadata;
 use uniffi_bindgen::interface::{Argument, ObjectImpl};
 
-
 use crate::gen::CodeType;
 use uniffi_bindgen::interface::{AsType, Callable, FfiType, Type};
 use uniffi_bindgen::ComponentInterface;
@@ -78,7 +77,6 @@ impl DartCodeOracle {
         format!("Uniffi{}", name.to_upper_camel_case())
     }
 
-
     /// Get the idiomatic Dart rendering of an exception name
     // pub fn error_name(nm: &str) -> String {
     //     let name = Self::class_name(nm);
@@ -93,7 +91,10 @@ impl DartCodeOracle {
     }
 
     /// Helper method to fully qualify imports of external `RustBuffer`s
-    fn rust_buffer_name(meta: &Option<ExternalFfiMetadata>, ci: &ComponentInterface) -> dart::Tokens {
+    fn rust_buffer_name(
+        meta: &Option<ExternalFfiMetadata>,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         if let Some(meta) = meta {
             return Self::rust_buffer_name_with_path(&meta.module_path, ci);
         }
@@ -102,7 +103,9 @@ impl DartCodeOracle {
 
     /// Helper method to fully qualify imports of external `RustBuffer`s
     fn rust_buffer_name_with_path(module_path: &str, ci: &ComponentInterface) -> dart::Tokens {
-        let namespace = ci.namespace_for_module_path(module_path).expect("module path should exist");
+        let namespace = ci
+            .namespace_for_module_path(module_path)
+            .expect("module path should exist");
         if namespace != ci.namespace() {
             return quote!($(namespace).RustBuffer);
         }
@@ -110,7 +113,10 @@ impl DartCodeOracle {
     }
 
     // TODO: Replace instances of `generate_ffi_dart_type` with ffi_type_label
-    pub fn ffi_dart_type_label(ffi_type: Option<&FfiType>, ci: &ComponentInterface) -> dart::Tokens {
+    pub fn ffi_dart_type_label(
+        ffi_type: Option<&FfiType>,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         if let Some(ret_type) = ffi_type {
             match ret_type {
                 FfiType::Int8 => quote!(int),
@@ -136,7 +142,10 @@ impl DartCodeOracle {
         }
     }
 
-    pub fn ffi_native_type_label(ffi_ret_type: Option<&FfiType>, ci: &ComponentInterface) -> dart::Tokens {
+    pub fn ffi_native_type_label(
+        ffi_ret_type: Option<&FfiType>,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         if let Some(ret_type) = ffi_ret_type {
             match ret_type {
                 FfiType::Int8 => quote!(Int8),
@@ -183,10 +192,9 @@ impl DartCodeOracle {
     }
 
     pub fn ffi_struct_name(name: &str) -> dart::Tokens {
-       quote!($(format!("Uniffi{}", name.to_upper_camel_case())))
+        quote!($(format!("Uniffi{}", name.to_upper_camel_case())))
     }
 
-    
     // pub fn convert_from_rust_buffer(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
     //     match ty {
     //         Type::Object { .. } => inner,
@@ -205,8 +213,6 @@ impl DartCodeOracle {
     //     }
     // }
 
-
-    
     pub fn type_lower_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
         match ty {
             Type::UInt32
@@ -279,7 +285,11 @@ impl DartCodeOracle {
                     let inner = DartCodeOracle::dart_type_label(Some(inner_type));
                     quote!(List<$inner>)
                 }
-                Type::Map { key_type, value_type, .. } => {
+                Type::Map {
+                    key_type,
+                    value_type,
+                    ..
+                } => {
                     let key = DartCodeOracle::dart_type_label(Some(key_type));
                     let value = DartCodeOracle::dart_type_label(Some(value_type));
                     quote!(Map<$key, $value>)
@@ -304,7 +314,10 @@ impl DartCodeOracle {
     }
 
     /// Get the native Dart FFI type rendering based on `Type`.
-    pub fn native_type_label(native_ret_type: Option<&Type>, ci: &ComponentInterface) -> dart::Tokens {
+    pub fn native_type_label(
+        native_ret_type: Option<&Type>,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         if let Some(ret_type) = native_ret_type {
             match ret_type {
                 Type::UInt8 => quote!(Uint8),
@@ -330,11 +343,13 @@ impl DartCodeOracle {
                 Type::Map { .. } => quote!(RustBuffer),
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(Int32),
-                Type::Record { module_path, .. } => Self::rust_buffer_name_with_path(module_path, ci),
+                Type::Record { module_path, .. } => {
+                    Self::rust_buffer_name_with_path(module_path, ci)
+                }
                 Type::Custom { name, .. } => {
                     let class_name = &DartCodeOracle::class_name(name);
                     quote!($class_name)
-                },
+                }
                 _ => quote!(Pointer<Void>),
             }
         } else {
@@ -343,7 +358,10 @@ impl DartCodeOracle {
     }
 
     /// Get the native Dart FFI type rendering based on `Type`.
-    pub fn native_dart_type_label(native_ret_type: Option<&Type>, ci: &ComponentInterface) -> dart::Tokens {
+    pub fn native_dart_type_label(
+        native_ret_type: Option<&Type>,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         if let Some(ret_type) = native_ret_type {
             match ret_type {
                 Type::UInt8
@@ -369,11 +387,13 @@ impl DartCodeOracle {
                 Type::Map { .. } => quote!(RustBuffer),
                 Type::Object { .. } => quote!(Pointer<Void>),
                 Type::Enum { .. } => quote!(int),
-                Type::Record { module_path, .. } => Self::rust_buffer_name_with_path(module_path, ci),
+                Type::Record { module_path, .. } => {
+                    Self::rust_buffer_name_with_path(module_path, ci)
+                }
                 Type::Custom { name, .. } => {
                     let type_name = &DartCodeOracle::class_name(name);
                     quote!($type_name)
-                },
+                }
                 _ => quote!(dynamic),
             }
         } else {
@@ -382,7 +402,11 @@ impl DartCodeOracle {
     }
 
     // Method to get the appropriate callback parameter type
-    pub fn callback_param_type(arg_type: &Type, arg_name: &str, ci: &ComponentInterface) -> dart::Tokens {
+    pub fn callback_param_type(
+        arg_type: &Type,
+        arg_name: &str,
+        ci: &ComponentInterface,
+    ) -> dart::Tokens {
         match arg_type {
             Type::Boolean => quote!(int $arg_name),
             Type::Bytes => quote!(RustBuffer $(arg_name)Buffer),
@@ -394,7 +418,7 @@ impl DartCodeOracle {
                     //let type_label = DartCodeOracle::dart_type_label(Some(arg_type));
                     quote!(RustBuffer $arg_name)
                 }
-            },
+            }
             Type::Sequence { inner_type } => {
                 if let Type::Int32 = **inner_type {
                     quote!(RustBuffer $(arg_name)Buffer)
@@ -402,8 +426,10 @@ impl DartCodeOracle {
                     //let type_label = DartCodeOracle::dart_type_label(Some(arg_type));
                     quote!(RustBuffer $arg_name)
                 }
-            },
-            Type::Record { module_path, .. } => quote!($(Self::rust_buffer_name_with_path(module_path, ci)) $arg_name),
+            }
+            Type::Record { module_path, .. } => {
+                quote!($(Self::rust_buffer_name_with_path(module_path, ci)) $arg_name)
+            }
             _ => {
                 let type_label = DartCodeOracle::dart_type_label(Some(arg_type));
                 quote!($type_label $arg_name)
@@ -412,7 +438,11 @@ impl DartCodeOracle {
     }
 
     // Method to generate code for handling callback return values
-    pub fn callback_return_handling(ret_type: &Type, method_name: &str, args: Vec<dart::Tokens>) -> dart::Tokens {
+    pub fn callback_return_handling(
+        ret_type: &Type,
+        method_name: &str,
+        args: Vec<dart::Tokens>,
+    ) -> dart::Tokens {
         match ret_type {
             Type::Boolean => {
                 // For boolean return values
@@ -420,7 +450,7 @@ impl DartCodeOracle {
                     final result = obj.$method_name($(for arg in &args => $arg,));
                     outReturn.value = result ? 1 : 0;
                 )
-            },
+            }
             Type::Optional { inner_type } => {
                 // For optional return values
                 if let Type::String = **inner_type {
@@ -448,7 +478,7 @@ impl DartCodeOracle {
                         }
                     )
                 }
-            },
+            }
             Type::String => {
                 // For string return values
                 quote!(
@@ -456,7 +486,7 @@ impl DartCodeOracle {
                     outReturn.ref = FfiConverterString.lower(result);
                     status.code = CALL_SUCCESS;
                 )
-            },
+            }
             Type::Sequence { inner_type } => {
                 if let Type::Int32 = **inner_type {
                     // For int32 sequence return values
@@ -472,7 +502,7 @@ impl DartCodeOracle {
                         outReturn.ref = $lowered.lower(result);
                     )
                 }
-            },
+            }
             _ => {
                 // For other return types
                 let lowered = ret_type.as_codetype().ffi_converter_name();
@@ -489,7 +519,7 @@ impl DartCodeOracle {
         if let Some(ret) = ret_type {
             match ret {
                 Type::Boolean => quote!(Pointer<Int8>),
-                _ => quote!(Pointer<RustBuffer>)
+                _ => quote!(Pointer<RustBuffer>),
             }
         } else {
             quote!(Pointer<Void>)
@@ -505,7 +535,11 @@ impl DartCodeOracle {
     }
 
     // Method to get the appropriate lift expression for callback arguments with indexed variable names
-    pub fn callback_arg_lift_indexed(arg_type: &Type, arg_name: &str, arg_idx: usize) -> dart::Tokens {
+    pub fn callback_arg_lift_indexed(
+        arg_type: &Type,
+        arg_name: &str,
+        arg_idx: usize,
+    ) -> dart::Tokens {
         // Use index-based variable names to avoid conflicts
         if let Type::Boolean = arg_type {
             quote!(final bool_arg$(arg_idx) = $arg_name == 1;)
@@ -549,10 +583,9 @@ impl DartCodeOracle {
             Type::Object { imp, .. } if imp == ObjectImpl::CallbackTrait => {
                 quote!(Pointer<Void>.fromAddress($(base_lower)))
             }
-            _ => base_lower
+            _ => base_lower,
         }
     }
-
 }
 
 // https://dart.dev/guides/language/language-tour#keywords
@@ -653,9 +686,15 @@ impl<T: AsType> AsCodeType for T {
                 *inner_type,
             )),
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
-            Type::Record {name, .. } => Box::new(records::RecordCodeType::new(name)),
-            Type::CallbackInterface { name, .. } => Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type())),
-            Type::Custom { name, module_path, builtin } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
+            Type::Record { name, .. } => Box::new(records::RecordCodeType::new(name)),
+            Type::CallbackInterface { name, .. } => Box::new(
+                callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()),
+            ),
+            Type::Custom {
+                name,
+                module_path,
+                builtin,
+            } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
             _ => todo!("As Type for Type::{:?}", self.as_type()),
         }
     }
