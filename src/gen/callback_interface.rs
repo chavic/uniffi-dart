@@ -171,13 +171,10 @@ fn generate_callback_methods_signatures(
     for (method_index, method) in methods.iter().enumerate() {
         //let method_name = DartCodeOracle::fn_name(method.name());
 
-        let ffi_method_type = format!(
-            "UniffiCallbackInterface{callback_name}Method{method_index}"
-        );
+        let ffi_method_type = format!("UniffiCallbackInterface{callback_name}Method{method_index}");
 
-        let dart_method_type = format!(
-            "UniffiCallbackInterface{callback_name}Method{method_index}Dart"
-        );
+        let dart_method_type =
+            format!("UniffiCallbackInterface{callback_name}Method{method_index}Dart");
 
         let method_return_type = if let Some(ret) = method.return_type() {
             DartCodeOracle::native_type_label(Some(ret), type_helper.get_ci())
