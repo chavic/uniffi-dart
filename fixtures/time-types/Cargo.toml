@@ -13,5 +13,5 @@ thiserror = "1.0"
 chrono = { version = "0.4", default-features = false, features = ["alloc", "std"] }
 
 [build-dependencies]
-uniffi-dart = { path = "../../" }
-camino = "1" 
+uniffi-dart = { path = "../../", features = ["build"] }
+camino = { workspace = true } 

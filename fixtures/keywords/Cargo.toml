@@ -11,4 +11,5 @@ crate-type = ["lib", "cdylib"]
 uniffi = "0.29"
 
 [build-dependencies]
-uniffi-dart = { path = "../../" } 
+uniffi-dart = { path = "../../", features = ["build"] }
+camino = { workspace = true } 

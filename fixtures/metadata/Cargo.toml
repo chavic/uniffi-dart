@@ -12,5 +12,5 @@ thiserror = "1.0"
 uniffi = "0.29"
 
 [build-dependencies]
-uniffi-dart = { path = "../../" }
-camino = "1" 
+uniffi-dart = { path = "../../", features = ["build"] }
+camino = { workspace = true } 

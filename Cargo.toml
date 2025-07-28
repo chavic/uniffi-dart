@@ -82,9 +82,7 @@ exclude = [
     "fixtures/simple-fns",
     "fixtures/dart_async",
     "fixtures/struct-default-values",
-    "fixtures/docstring",
     "fixtures/keywords",
-    "fixtures/metadata",
     "fixtures/time-types",
 ]
 
@@ -93,3 +91,4 @@ uniffi = { version = "0.29.0" }
 uniffi_bindgen = { version = "0.29.0" }
 uniffi_build = { version = "0.29.0" }
 uniffi_testing = { version = "0.29.0" }
+camino = { version = "1.1" }
