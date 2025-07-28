@@ -23,7 +23,7 @@ impl DartCodeOracle {
     /// Sanitize a Dart identifier, appending an underscore if it's a reserved keyword.
     pub fn sanitize_identifier(id: &str) -> String {
         if Self::is_reserved_identifier(id) {
-            format!("{}_", id)
+            format!("{id}_")
         } else {
             id.to_string()
         }
@@ -135,7 +135,7 @@ impl DartCodeOracle {
                 FfiType::Handle => quote!(Pointer<Void>),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
                 FfiType::Reference(inner) => quote!($(Self::ffi_type_label_by_reference(inner))),
-                _ => panic!("Unimplemented FfiType: {:?}", ret_type), // Fallback implementation
+                _ => panic!("Unimplemented FfiType: {ret_type:?}"), // Fallback implementation
             }
         } else {
             quote!(void)
@@ -164,7 +164,7 @@ impl DartCodeOracle {
                 FfiType::Handle => quote!(Pointer<Void>),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
                 FfiType::Reference(inner) => quote!($(Self::ffi_type_label_by_reference(inner))),
-                _ => panic!("Unimplemented FfiType: {:?}", ret_type), // Fallback implementation
+                _ => panic!("Unimplemented FfiType: {ret_type:?}"), // Fallback implementation
             }
         } else {
             quote!(void)

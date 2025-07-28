@@ -91,7 +91,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     }
 
     let cls_name = &DartCodeOracle::class_name(obj.name());
-    let finalizer_cls_name = &format!("{}Finalizer", cls_name);
+    let finalizer_cls_name = &format!("{cls_name}Finalizer");
     let lib_instance = &DartCodeOracle::find_lib_instance();
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
@@ -155,7 +155,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
 
     let error_handler_class = if is_error_interface {
         // Generate error handlers for specific error interfaces
-        let error_handler_name = format!("{}ErrorHandler", cls_name);
+        let error_handler_name = format!("{cls_name}ErrorHandler");
         let instance_name = cls_name.to_lower_camel_case();
         quote! {
             class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
@@ -180,7 +180,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     // Generate toString() method for error interfaces
     let to_string_method: dart::Tokens = if is_error_interface && !obj.is_trait_interface() {
         // Only generate toString for regular error interfaces, skip trait interfaces for now
-        let dart_class_name = format!("\"{}\"", cls_name);
+        let dart_class_name = format!("\"{cls_name}\"");
         quote! {
             @override
             String toString() {
@@ -294,27 +294,25 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
             }
 
         )
-    } else {
-        if ret == quote!(void) {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) {
-                        $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
-                            uniffiClonePointer(),
-                            $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                        );
-                    }, $error_handler);
-                }
-            )
-        } else {
-            quote!(
-                $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                    return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+    } else if ret == quote!(void) {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) {
+                    $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
-                    )), $error_handler);
-                }
-            )
-        }
+                    );
+                }, $error_handler);
+            }
+        )
+    } else {
+        quote!(
+            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
+                return rustCall((status) => $lifter($(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
+                    uniffiClonePointer(),
+                    $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
+                )), $error_handler);
+            }
+        )
     }
 }

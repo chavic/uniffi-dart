@@ -91,7 +91,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
         // helper functions to get the sanitized field name and type strings
         fn field_name(field: &Field, field_num: usize) -> String {
             if field.name().is_empty() {
-                format!("v{}", field_num)
+                format!("v{field_num}")
             } else {
                 DartCodeOracle::var_name(field.name())
             }
@@ -209,7 +209,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                             .collect::<Vec<_>>()
                             .join(", ");
                         let to_string_with_fields =
-                            format!("\"{}({})\"", variant_dart_cls_name, field_interpolations);
+                            format!("\"{variant_dart_cls_name}({field_interpolations})\"");
                         quote!(
                             @override
                             String toString() {
@@ -283,7 +283,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
 
         // For error enums, also generate an error handler
         let error_handler_class = if is_error_enum {
-            let error_handler_name = format!("{}ErrorHandler", dart_cls_name);
+            let error_handler_name = format!("{dart_cls_name}ErrorHandler");
             let instance_name = dart_cls_name.to_lower_camel_case();
             quote! {
                 class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {

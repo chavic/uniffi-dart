@@ -262,7 +262,7 @@ impl BindgenCrateConfigSupplier for LocalConfigSupplier {
         let mut reader = std::io::BufReader::new(file);
         let mut content = String::new();
         reader.read_to_string(&mut content)?;
-        return Ok(content);
+        Ok(content)
     }
 }
 

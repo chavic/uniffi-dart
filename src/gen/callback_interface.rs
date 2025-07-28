@@ -81,7 +81,7 @@ pub fn generate_callback_interface(
 ) -> dart::Tokens {
     let cls_name = &DartCodeOracle::class_name(callback_name);
     let ffi_conv_name = &DartCodeOracle::class_name(ffi_converter_name);
-    let init_fn_name = &format!("init{}VTable", callback_name);
+    let init_fn_name = &format!("init{callback_name}VTable");
 
     let tokens = quote! {
         // This is the abstract class to be implemented
@@ -139,7 +139,7 @@ fn generate_callback_methods_definitions(
     method: &Method,
     type_helper: &dyn TypeHelperRenderer,
 ) -> dart::Tokens {
-    let method_name = DartCodeOracle::fn_name(&method.name());
+    let method_name = DartCodeOracle::fn_name(method.name());
     let dart_args = &method
         .arguments()
         .iter()
@@ -149,7 +149,6 @@ fn generate_callback_methods_definitions(
 
             quote!($arg_type $arg_name)
         })
-        .into_iter()
         .collect::<Vec<_>>();
 
     let ret_type = if let Some(ret) = method.return_type() {
@@ -173,13 +172,11 @@ fn generate_callback_methods_signatures(
         //let method_name = DartCodeOracle::fn_name(method.name());
 
         let ffi_method_type = format!(
-            "UniffiCallbackInterface{}Method{}",
-            callback_name, method_index
+            "UniffiCallbackInterface{callback_name}Method{method_index}"
         );
 
         let dart_method_type = format!(
-            "UniffiCallbackInterface{}Method{}Dart",
-            callback_name, method_index
+            "UniffiCallbackInterface{callback_name}Method{method_index}Dart"
         );
 
         let method_return_type = if let Some(ret) = method.return_type() {
@@ -210,8 +207,8 @@ pub fn generate_callback_vtable_interface(
     callback_name: &str,
     methods: &[&Method],
 ) -> dart::Tokens {
-    let vtable_name = format!("UniffiVTableCallbackInterface{}", callback_name);
-    let methods_vec: Vec<_> = methods.into_iter().enumerate().collect();
+    let vtable_name = format!("UniffiVTableCallbackInterface{callback_name}");
+    let methods_vec: Vec<_> = methods.iter().enumerate().collect();
 
     quote! {
         final class $vtable_name extends Struct {
@@ -231,9 +228,9 @@ pub fn generate_callback_functions(
     let cls_name = &DartCodeOracle::class_name(callback_name);
 
     let functions: Vec<dart::Tokens> = methods.iter().enumerate().map(|(index, m)| {
-        let method_name = &format!("{}", &DartCodeOracle::fn_name(m.name()));
-        let ffi_method_type = &format!("UniffiCallbackInterface{}Method{}", callback_name, index);
-        let _dart_method_type = &format!("UniffiCallbackInterface{}Method{}Dart", callback_name, index);
+        let method_name = &(&DartCodeOracle::fn_name(m.name())).to_string();
+        let ffi_method_type = &format!("UniffiCallbackInterface{callback_name}Method{index}");
+        let _dart_method_type = &format!("UniffiCallbackInterface{callback_name}Method{index}Dart");
 
         // Get parameter types using the oracle
         let param_types: Vec<dart::Tokens> = m.arguments().iter().map(|arg| {
@@ -287,7 +284,7 @@ pub fn generate_callback_functions(
     // Free callback
     let free_callback_fn = &format!("{}FreeCallback", DartCodeOracle::fn_name(callback_name));
     let free_callback_pointer = &format!("{}FreePointer", DartCodeOracle::fn_name(callback_name));
-    let free_callback_type = &format!("UniffiCallbackInterface{}Free", callback_name);
+    let free_callback_type = &format!("UniffiCallbackInterface{callback_name}Free");
 
     quote! {
         $(functions)
@@ -310,10 +307,10 @@ pub fn generate_callback_interface_vtable_init_function(
     methods: &[&Method],
     namespace: &str,
 ) -> dart::Tokens {
-    let vtable_name = &format!("UniffiVTableCallbackInterface{}", callback_name);
+    let vtable_name = &format!("UniffiVTableCallbackInterface{callback_name}");
     let vtable_static_instance_name =
         format!("{}{}", DartCodeOracle::fn_name(callback_name), "VTable");
-    let init_fn_name = &format!("init{}VTable", callback_name);
+    let init_fn_name = &format!("init{callback_name}VTable");
 
     quote! {
         late final Pointer<$vtable_name> $(&vtable_static_instance_name);
