@@ -4,11 +4,9 @@ on:
       - "main"
   pull_request:
 
-
 name: Testing
 
 jobs:
-
   test:
     name: Test Suite
     runs-on: ubuntu-latest
@@ -20,27 +18,18 @@ jobs:
           - nightly
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
-      # TODO: Re-enable when GitHub cache service is stable
-      # Temporarily disabled due to "Cache service responded with 400" errors
-      # - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.1
-      #   name: Cargo Cache
-      #   with:
-      #     command: cache
-      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
-        name: Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          command: install-rustup
           toolchain: ${{ matrix.rust }}
-          profile: minimal
-          default: true
-      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
-        name: Install nextest
-        with:
-          command: cargo install
-          args: cargo-nextest
+
+      - name: Use cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cargo-nextest
 
       - name: Install Dart toolchain
         uses: dart-lang/setup-dart@v1
@@ -48,7 +37,6 @@ jobs:
       - name: Run cargo nextest
         continue-on-error: ${{ matrix.rust == 'nightly' }}
         run: cargo nextest run --all
-
 
   lints:
     name: Lints
@@ -61,23 +49,16 @@ jobs:
           - nightly
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - uses: actions/checkout@v3
-      # TODO: Re-enable when GitHub cache service is stable
-      # Temporarily disabled due to "Cache service responded with 400" errors
-      # - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.1
-      #   name: Cargo Cache
-      #   with:
-      #     command: cache
-      - uses: FrancisRussell/ferrous-actions@v0.1.0-beta.2
-        name: Install Rust toolchain
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          command: install-rustup
           toolchain: ${{ matrix.rust }}
-          profile: minimal
           components: clippy rustfmt
-          default: true
+
+      - name: Use cache
+        uses: Swatinem/rust-cache@v2
           
       - name: Format
         continue-on-error: ${{ matrix.rust == 'nightly' }}
