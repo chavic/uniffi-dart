@@ -67,7 +67,25 @@ members = [
 exclude = [
     "fixtures/coverall",
     "fixtures/custom_types",
-    "fixtuers/dispose",
+    "fixtures/dispose",
+    "fixtures/proc-macro",
+    "fixtures/proc-macro-no-implicit-prelude",
+    "fixtures/callbacks",
+    "fixtures/benchmarks",
+    "fixtures/docstring-proc-macro",
+    "fixtures/large_enum",
+    "fixtures/error_types",
+    "fixtures/trait-methods",
+    "fixtures/large-error",
+    "fixtures/enum-types",
+    "fixtures/type-limits",
+    "fixtures/simple-fns",
+    "fixtures/dart_async",
+    "fixtures/struct-default-values",
+    "fixtures/docstring",
+    "fixtures/keywords",
+    "fixtures/metadata",
+    "fixtures/time-types",
 ]
 
 [workspace.dependencies]
