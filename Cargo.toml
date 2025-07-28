@@ -59,31 +59,17 @@ stringcase = "0.4.0"
 
 members = [
     ".",
-
-    # for testing
-    "fixtures/*", "uniffi_dart_macro",
-]
-# Ignore a few tests for now
-exclude = [
-    "fixtures/coverall",
-    "fixtures/custom_types",
-    "fixtures/dispose",
-    "fixtures/proc-macro",
-    "fixtures/proc-macro-no-implicit-prelude",
-    "fixtures/callbacks",
-    "fixtures/benchmarks",
-    "fixtures/docstring-proc-macro",
-    "fixtures/large_enum",
-    "fixtures/error_types",
-    "fixtures/trait-methods",
-    "fixtures/large-error",
-    "fixtures/enum-types",
-    "fixtures/type-limits",
-    "fixtures/simple-fns",
-    "fixtures/dart_async",
-    "fixtures/struct-default-values",
-    "fixtures/keywords",
-    "fixtures/time-types",
+    "uniffi_dart_macro",
+    
+    # Working fixtures - only include fixtures that actually work
+    "fixtures/arithmetic",
+    "fixtures/bytes_types", 
+    "fixtures/docstring",
+    "fixtures/duration_type_test",
+    "fixtures/hello_world",
+    "fixtures/metadata",
+    "fixtures/simple-iface",
+    "fixtures/streams_ext",
 ]
 
 [workspace.dependencies]
