@@ -10,3 +10,5 @@ og-fixtures/*
 **/.dart_tool/*
 rust-toolchain.toml
 internal_todo.md
+ISSUES.md
+.tmp_tests/
