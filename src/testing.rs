@@ -76,7 +76,7 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
         println!("FAILED");
         if std::env::var("CI").is_err() {
             // skip in CI environment
-            thread::sleep(Duration::from_secs(120));
+            thread::sleep(Duration::from_secs(2));
         }
         bail!("running `dart` to run test script failed ({:?})", command);
     }
