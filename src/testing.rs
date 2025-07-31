@@ -16,11 +16,14 @@ pub struct CompileSource {
 }
 
 pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Result<()> {
-    let tmp_dir = camino_tempfile::tempdir()?;
+    // Use .tmp_tests/ directory in project root for easier debugging
+    // Navigate to project root (fixtures are 2 levels deep: fixtures/fixture_name/)
+    let tmp_tests_dir = Utf8Path::new("../../.tmp_tests");
+    create_dir_all(&tmp_tests_dir)?;
 
     let script_path = Utf8Path::new(".").canonicalize_utf8()?;
     let test_helper = UniFFITestHelper::new(fixture)?;
-    let out_dir = test_helper.create_out_dir(&tmp_dir, &script_path)?;
+    let out_dir = test_helper.create_out_dir(&tmp_tests_dir, &script_path)?;
 
     let udl_path = Utf8Path::new(".").canonicalize_utf8()?.join(udl_path);
     let config_path = if let Some(path) = config_path {
@@ -58,11 +61,29 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
         &test_helper.cdylib_path()?,
         false, // library_mode
     )?;
-    for file in glob::glob(&format!("**/*.dart"))?.filter_map(Result::ok) {
-        copy(
-            &file,
-            out_dir.join(file.as_os_str().to_str().expect("bad filename")),
-        )?;
+    // Copy fixture test files to output directory
+    let test_glob_pattern = "test/*.dart";
+    for file in glob::glob(test_glob_pattern)?.filter_map(Result::ok) {
+        let filename = file
+            .file_name()
+            .expect("bad filename")
+            .to_str()
+            .expect("non-UTF8 filename");
+        copy(&file, test_outdir.join(filename))?;
+    }
+
+    // Format the generated Dart code before running tests (best-effort)
+    let mut format_command = Command::new("dart");
+    format_command.current_dir(&out_dir).arg("format").arg(".");
+    match format_command.spawn().and_then(|mut c| c.wait()) {
+        Ok(status) if status.success() => {}
+        Ok(_) | Err(_) => {
+            println!("WARNING: dart format unavailable or failed; continuing with tests anyway");
+            if std::env::var("CI").is_err() {
+                // skip in CI environment
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
     }
 
     // Run the test script against compiled bindings
@@ -73,7 +94,7 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
         println!("FAILED");
         if std::env::var("CI").is_err() {
             // skip in CI environment
-            thread::sleep(Duration::from_secs(120));
+            thread::sleep(Duration::from_secs(2));
         }
         bail!("running `dart` to run test script failed ({:?})", command);
     }
