@@ -94,7 +94,10 @@ impl<T: AsType> AsRenderable for T {
                 self.as_type(),
                 *inner_type,
             )),
-            Type::Map { key_type, value_type } => Box::new(compounds::MapCodeType::new(
+            Type::Map {
+                key_type,
+                value_type,
+            } => Box::new(compounds::MapCodeType::new(
                 self.as_type(),
                 *key_type,
                 *value_type,

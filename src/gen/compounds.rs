@@ -194,7 +194,11 @@ pub struct MapCodeType {
 
 impl MapCodeType {
     pub fn new(self_type: Type, key: Type, value: Type) -> Self {
-        Self { self_type, key, value }
+        Self {
+            self_type,
+            key,
+            value,
+        }
     }
 
     fn key(&self) -> &Type {
