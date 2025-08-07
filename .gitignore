@@ -4,7 +4,6 @@
 experiments/*
 og-fixtures/*
 .vscode/*
-.vscode/settings.json
 .aider*
 .dart_tool/*
 **/.dart_tool/*
@@ -13,3 +12,4 @@ internal_todo.md
 ISSUES.md
 .tmp_tests/
 convert_fixtures.sh
+.DS_Store
