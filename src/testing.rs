@@ -64,7 +64,11 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
     // Copy fixture test files to output directory
     let test_glob_pattern = "test/*.dart";
     for file in glob::glob(test_glob_pattern)?.filter_map(Result::ok) {
-        let filename = file.file_name().expect("bad filename").to_str().expect("non-UTF8 filename");
+        let filename = file
+            .file_name()
+            .expect("bad filename")
+            .to_str()
+            .expect("non-UTF8 filename");
         copy(&file, test_outdir.join(filename))?;
     }
 
@@ -79,7 +83,10 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
             thread::sleep(Duration::from_secs(1));
         }
         // Don't fail the entire process if formatting fails, just warn
-        println!("Warning: running `dart format` failed ({:?})", format_command);
+        println!(
+            "Warning: running `dart format` failed ({:?})",
+            format_command
+        );
     }
 
     // Run the test script against compiled bindings
