@@ -78,9 +78,7 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
     match format_command.spawn().and_then(|mut c| c.wait()) {
         Ok(status) if status.success() => {}
         Ok(_) | Err(_) => {
-            println!(
-                "WARNING: dart format unavailable or failed; continuing with tests anyway"
-            );
+            println!("WARNING: dart format unavailable or failed; continuing with tests anyway");
             if std::env::var("CI").is_err() {
                 // skip in CI environment
                 thread::sleep(Duration::from_secs(1));
