@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Read;
+use std::process::Command;
 
 use anyhow::Result;
 use camino::Utf8Path;
@@ -226,6 +227,22 @@ impl BindingGenerator for DartBindingGenerator {
 
             tokens.format_file(&mut w.as_formatter(&fmt), &config)?;
         }
+
+        // Run full Dart formatter on the output directory as a best-effort step.
+        // This is non-fatal: failures will only emit a warning.
+        let mut format_command = Command::new("dart");
+        format_command
+            .current_dir(&settings.out_dir)
+            .arg("format")
+            .arg(".");
+        match format_command.spawn().and_then(|mut c| c.wait()) {
+            Ok(status) if status.success() => {}
+            Ok(_) | Err(_) => {
+                println!(
+                    "WARNING: dart format failed or is unavailable; proceeding without full formatting"
+                );
+            }
+        }
         Ok(())
     }
 
@@ -281,7 +298,7 @@ pub fn generate_dart_bindings(
             &LocalConfigSupplier(udl_file.to_string()),
             None,
             out_dir_override.unwrap(),
-            false,
+            true,
         )?;
         Ok(())
     } else {
