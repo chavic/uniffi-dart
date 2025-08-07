@@ -1,12 +1,12 @@
 [package]
-name = "proc_macro"
+name = "proc_macro_uniffi"
 version = "0.1.0"
 edition = "2021"
 license = "MPL-2.0"
 publish = false
 
 [lib]
-name = "proc_macro"
+name = "proc_macro_uniffi"
 crate-type = ["lib", "cdylib"]
 
 [features]

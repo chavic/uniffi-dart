@@ -12,3 +12,4 @@ rust-toolchain.toml
 internal_todo.md
 ISSUES.md
 .tmp_tests/
+convert_fixtures.sh
