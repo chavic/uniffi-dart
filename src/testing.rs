@@ -68,6 +68,20 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
         copy(&file, test_outdir.join(filename))?;
     }
 
+    // Format the generated Dart code before running tests
+    let mut format_command = Command::new("dart");
+    format_command.current_dir(&out_dir).arg("format").arg(".");
+    let format_status = format_command.spawn()?.wait()?;
+    if !format_status.success() {
+        println!("WARNING: dart format failed, continuing with tests anyway");
+        if std::env::var("CI").is_err() {
+            // skip in CI environment
+            thread::sleep(Duration::from_secs(1));
+        }
+        // Don't fail the entire process if formatting fails, just warn
+        println!("Warning: running `dart format` failed ({:?})", format_command);
+    }
+
     // Run the test script against compiled bindings
     let mut command = Command::new("dart");
     command.current_dir(&out_dir).arg("test");
