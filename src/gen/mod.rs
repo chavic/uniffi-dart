@@ -281,7 +281,7 @@ pub fn generate_dart_bindings(
             &LocalConfigSupplier(udl_file.to_string()),
             None,
             out_dir_override.unwrap(),
-            false,
+            true,
         )?;
         Ok(())
     } else {
