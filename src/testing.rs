@@ -64,8 +64,26 @@ pub fn run_test(fixture: &str, udl_path: &str, config_path: Option<&str>) -> Res
     // Copy fixture test files to output directory
     let test_glob_pattern = "test/*.dart";
     for file in glob::glob(test_glob_pattern)?.filter_map(Result::ok) {
-        let filename = file.file_name().expect("bad filename").to_str().expect("non-UTF8 filename");
+        let filename = file
+            .file_name()
+            .expect("bad filename")
+            .to_str()
+            .expect("non-UTF8 filename");
         copy(&file, test_outdir.join(filename))?;
+    }
+
+    // Format the generated Dart code before running tests (best-effort)
+    let mut format_command = Command::new("dart");
+    format_command.current_dir(&out_dir).arg("format").arg(".");
+    match format_command.spawn().and_then(|mut c| c.wait()) {
+        Ok(status) if status.success() => {}
+        Ok(_) | Err(_) => {
+            println!("WARNING: dart format unavailable or failed; continuing with tests anyway");
+            if std::env::var("CI").is_err() {
+                // skip in CI environment
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
     }
 
     // Run the test script against compiled bindings
