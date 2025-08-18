@@ -13,3 +13,5 @@ ISSUES.md
 .tmp_tests/
 convert_fixtures.sh
 .DS_Store
+ISSUES.md
+.tmp_tests/

@@ -69,7 +69,7 @@ members = [
     "fixtures/metadata",
     "fixtures/simple-iface",
     "fixtures/streams_ext",
-    #"fixtures/*",
+    "fixtures/simple-fns",
 ]
 
 [workspace.dependencies]
