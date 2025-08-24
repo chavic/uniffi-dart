@@ -69,12 +69,7 @@ impl_code_type_for_primitive!(Float32CodeType, "double", "Double32");
 impl_code_type_for_primitive!(Float64CodeType, "double", "Double64");
 
 impl_renderable_for_primitive!(BytesCodeType, "Uint8List", "Uint8List");
-impl_renderable_for_primitive!(Int8CodeType, "int", "Int8", 1);
-impl_renderable_for_primitive!(Int16CodeType, "int", "Int16", 2);
-impl_renderable_for_primitive!(Int32CodeType, "int", "Int32", 4);
-impl_renderable_for_primitive!(UInt8CodeType, "int", "UInt8", 1);
-impl_renderable_for_primitive!(UInt16CodeType, "int", "UInt16", 2);
-impl_renderable_for_primitive!(UInt32CodeType, "int", "UInt32", 4);
+// Custom implementations for integer types with bounds checking
 impl_renderable_for_primitive!(Float32CodeType, "double", "Double32", 4);
 impl_renderable_for_primitive!(Float64CodeType, "double", "Double64", 8);
 
@@ -156,6 +151,205 @@ impl Renderable for UInt64CodeType {
                 static int write($type_signature value, Uint8List buf) {
                     buf.buffer.asByteData(buf.offsetInBytes).setUint64(0, lower(value));
                     return 8;
+                }
+            }
+        }
+    }
+}
+
+// Custom implementations for smaller integer types with bounds checking
+impl Renderable for Int8CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getInt8(0), 1);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < -128 || value > 127) {
+                        throw ArgumentError("Value out of range for i8: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 1;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setInt8(0, lower(value));
+                    return 1;
+                }
+            }
+        }
+    }
+}
+
+impl Renderable for Int16CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getInt16(0), 2);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < -32768 || value > 32767) {
+                        throw ArgumentError("Value out of range for i16: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 2;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setInt16(0, lower(value));
+                    return 2;
+                }
+            }
+        }
+    }
+}
+
+impl Renderable for Int32CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getInt32(0), 4);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < -2147483648 || value > 2147483647) {
+                        throw ArgumentError("Value out of range for i32: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 4;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setInt32(0, lower(value));
+                    return 4;
+                }
+            }
+        }
+    }
+}
+
+impl Renderable for UInt8CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getUint8(0), 1);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < 0 || value > 255) {
+                        throw ArgumentError("Value out of range for u8: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 1;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setUint8(0, lower(value));
+                    return 1;
+                }
+            }
+        }
+    }
+}
+
+impl Renderable for UInt16CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getUint16(0), 2);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < 0 || value > 65535) {
+                        throw ArgumentError("Value out of range for u16: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 2;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setUint16(0, lower(value));
+                    return 2;
+                }
+            }
+        }
+    }
+}
+
+impl Renderable for UInt32CodeType {
+    fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
+        let cl_name = &self.ffi_converter_name();
+        let type_signature = &self.type_label();
+
+        quote! {
+            class $cl_name {
+                static $type_signature lift($type_signature value) => value;
+
+                static LiftRetVal<$type_signature> read(Uint8List buf) {
+                    return LiftRetVal(buf.buffer.asByteData(buf.offsetInBytes).getUint32(0), 4);
+                }
+
+                static $type_signature lower($type_signature value) {
+                    if (value < 0 || value > 4294967295) {
+                        throw ArgumentError("Value out of range for u32: " + value.toString());
+                    }
+                    return value;
+                }
+
+                static int allocationSize([$type_signature value = 0]) {
+                    return 4;
+                }
+
+                static int write($type_signature value, Uint8List buf) {
+                    buf.buffer.asByteData(buf.offsetInBytes).setUint32(0, lower(value));
+                    return 4;
                 }
             }
         }
