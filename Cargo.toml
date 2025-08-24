@@ -69,6 +69,7 @@ members = [
     "fixtures/metadata",
     "fixtures/simple-iface",
     "fixtures/streams_ext",
+    "fixtures/simple-fns",
     #"fixtures/*",
 ]
 
