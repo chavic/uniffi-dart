@@ -31,8 +31,7 @@ void main() {
 
       test('i64 bounds', () {
         // Test valid lower bound
-        final minI64 =
-            -9223372036854775808; // -2^63 (this is within Dart's range)
+        final minI64 = BigInt.from(-9223372036854775808); // -2^63
         expect(takeI64(minI64), minI64);
 
         // Test values that would overflow are caught by Dart
@@ -67,8 +66,7 @@ void main() {
 
       test('i64 bounds', () {
         // Test valid upper bound
-        final maxI64 =
-            9223372036854775807; // 2^63 - 1 (this is within Dart's range)
+        final maxI64 = BigInt.from(9223372036854775807); // 2^63 - 1
         expect(takeI64(maxI64), maxI64);
 
         // Test values that would overflow are caught by Dart
@@ -103,10 +101,10 @@ void main() {
 
       test('u64 bounds', () {
         // Test valid lower bound
-        expect(takeU64(0), 0);
+        expect(takeU64(BigInt.zero), BigInt.zero);
 
         // Test invalid lower bound
-        expect(() => takeU64(-1), throwsArgumentError);
+        expect(() => takeU64(BigInt.from(-1)), throwsArgumentError);
       });
     });
 
@@ -226,12 +224,18 @@ void main() {
         expect(takeI8(100), 100);
         expect(takeI16(10000), 10000);
         expect(takeI32(1000000000), 1000000000);
-        expect(takeI64(1000000000000000000), 1000000000000000000);
+        expect(
+          takeI64(BigInt.from(1000000000000000000)),
+          BigInt.from(1000000000000000000),
+        );
 
         expect(takeU8(100), 100);
         expect(takeU16(10000), 10000);
         expect(takeU32(1000000000), 1000000000);
-        expect(takeU64(1000000000000000000), 1000000000000000000);
+        expect(
+          takeU64(BigInt.from(1000000000000000000)),
+          BigInt.from(1000000000000000000),
+        );
       });
 
       test('large invalid numbers', () {
@@ -250,11 +254,11 @@ void main() {
         expect(takeI8(0), 0);
         expect(takeI16(0), 0);
         expect(takeI32(0), 0);
-        expect(takeI64(0), 0);
+        expect(takeI64(BigInt.zero), BigInt.zero);
         expect(takeU8(0), 0);
         expect(takeU16(0), 0);
         expect(takeU32(0), 0);
-        expect(takeU64(0), 0);
+        expect(takeU64(BigInt.zero), BigInt.zero);
         expect(takeF32(0.0), 0.0);
         expect(takeF64(0.0), 0.0);
       });

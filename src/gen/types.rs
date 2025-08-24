@@ -445,14 +445,11 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
 pub fn generate_type(ty: &Type) -> dart::Tokens {
     match ty {
-        Type::UInt8
-        | Type::UInt32
-        | Type::Int8
-        | Type::Int16
-        | Type::Int64
-        | Type::UInt16
-        | Type::Int32
-        | Type::UInt64 => quote!(int),
+        Type::UInt8 | Type::UInt32 | Type::Int8 | Type::Int16 | Type::UInt16 | Type::Int32 => {
+            quote!(int)
+        }
+        // Use BigInt for 64-bit integers to handle values that exceed Dart's safe integer limits
+        Type::Int64 | Type::UInt64 => quote!(BigInt),
         Type::Float32 | Type::Float64 => quote!(double),
         Type::String => quote!(String),
         Type::Bytes => quote!(Uint8List),

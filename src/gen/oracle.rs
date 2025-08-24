@@ -221,10 +221,12 @@ impl DartCodeOracle {
             | Type::Int16
             | Type::UInt16
             | Type::Int32
-            | Type::Int64
-            | Type::UInt64
             | Type::Float32
             | Type::Float64 => inner,
+            // 64-bit integers need lowering because they use BigInt
+            Type::Int64 | Type::UInt64 => {
+                quote!($(ty.as_codetype().ffi_converter_name()).lower($inner))
+            }
             Type::Boolean
             | Type::Duration
             | Type::String
@@ -261,11 +263,11 @@ impl DartCodeOracle {
                 Type::UInt8
                 | Type::UInt16
                 | Type::UInt32
-                | Type::UInt64
                 | Type::Int8
                 | Type::Int16
-                | Type::Int32
-                | Type::Int64 => quote!(int),
+                | Type::Int32 => quote!(int),
+                // Use BigInt for 64-bit integers to handle values that exceed Dart's safe integer limits
+                Type::Int64 | Type::UInt64 => quote!(BigInt),
                 Type::Float32 | Type::Float64 => quote!(double),
                 Type::Boolean => quote!(bool),
                 Type::Bytes => quote!(Uint8List),
