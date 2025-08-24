@@ -215,16 +215,17 @@ impl DartCodeOracle {
 
     pub fn type_lower_fn(ty: &Type, inner: dart::Tokens) -> dart::Tokens {
         match ty {
-            Type::UInt32
-            | Type::Int8
-            | Type::UInt8
+            // Float types don't need validation, just pass through
+            Type::Float32 | Type::Float64 => inner,
+            // All integer types now have validation and need lowering
+            Type::Int8
             | Type::Int16
-            | Type::UInt16
             | Type::Int32
-            | Type::Float32
-            | Type::Float64 => inner,
-            // 64-bit integers need lowering because they use BigInt
-            Type::Int64 | Type::UInt64 => {
+            | Type::Int64
+            | Type::UInt8
+            | Type::UInt16
+            | Type::UInt32
+            | Type::UInt64 => {
                 quote!($(ty.as_codetype().ffi_converter_name()).lower($inner))
             }
             Type::Boolean
