@@ -195,4 +195,143 @@ pub struct MapEntry {
     pub value: Value,
 }
 
+// Nested Collection Tests for Phase 2
+#[uniffi::export]
+fn take_nested_i32_list(value: Vec<Vec<i32>>) -> Vec<Vec<i32>> {
+    value
+}
+
+#[uniffi::export]
+fn make_nested_i32_list() -> Vec<Vec<i32>> {
+    vec![vec![1, 2, 3], vec![4, 5], vec![6, 7, 8, 9]]
+}
+
+#[uniffi::export]
+fn take_optional_i32_list(value: Option<Vec<i32>>) -> Option<Vec<i32>> {
+    value
+}
+
+#[uniffi::export]
+fn make_optional_i32_list() -> Option<Vec<i32>> {
+    Some(vec![10, 20, 30])
+}
+
+// HashMap/Map Tests for Phase 2.3
+#[uniffi::export]
+fn take_string_map(
+    map: std::collections::HashMap<String, String>,
+) -> std::collections::HashMap<String, String> {
+    map
+}
+
+#[uniffi::export]
+fn make_string_map() -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("hello".to_string(), "world".to_string());
+    map.insert("foo".to_string(), "bar".to_string());
+    map
+}
+
+#[uniffi::export]
+fn take_int_map(
+    map: std::collections::HashMap<i32, String>,
+) -> std::collections::HashMap<i32, String> {
+    map
+}
+
+#[uniffi::export]
+fn make_int_map() -> std::collections::HashMap<i32, String> {
+    let mut map = std::collections::HashMap::new();
+    map.insert(1, "one".to_string());
+    map.insert(2, "two".to_string());
+    map.insert(42, "answer".to_string());
+    map
+}
+
+// Complex Type Sequence Tests for Phase 2.2 - Debug step by step
+#[uniffi::export]
+fn take_simple_value_list(values: Vec<Value>) -> Vec<Value> {
+    values
+}
+
+#[uniffi::export]
+fn make_simple_value_list() -> Vec<Value> {
+    vec![Value::String {
+        value: "hello".to_string(),
+    }]
+}
+
+// Test single MapEntry first (no sequence)
+#[uniffi::export]
+fn take_single_map_entry(entry: MapEntry) -> MapEntry {
+    entry
+}
+
+#[uniffi::export]
+fn make_single_map_entry() -> MapEntry {
+    MapEntry {
+        key: Value::String {
+            value: "name".to_string(),
+        },
+        value: Value::String {
+            value: "Alice".to_string(),
+        },
+    }
+}
+
+// Debug allocation size calculation
+#[uniffi::export]
+fn debug_string_value() -> Value {
+    Value::String {
+        value: "test".to_string(),
+    }
+}
+
+// Test empty sequence first
+#[uniffi::export]
+fn take_empty_map_entry_list(entries: Vec<MapEntry>) -> Vec<MapEntry> {
+    entries
+}
+
+#[uniffi::export]
+fn make_empty_map_entry_list() -> Vec<MapEntry> {
+    vec![]
+}
+
+// Test just simple integers first
+#[uniffi::export]
+fn take_i32_list_simple(values: Vec<i32>) -> Vec<i32> {
+    values
+}
+
+#[uniffi::export]
+fn make_i32_list_simple() -> Vec<i32> {
+    vec![42]
+}
+
+// Test just enum sequences (we know these work)
+#[uniffi::export]
+fn take_bool_value_list(values: Vec<Value>) -> Vec<Value> {
+    values
+}
+
+#[uniffi::export]
+fn make_bool_value_list() -> Vec<Value> {
+    vec![Value::Bool { value: true }]
+}
+
+// Now test simple record sequence (the problematic case)
+#[uniffi::export]
+fn take_simple_record_list(entries: Vec<MapEntry>) -> Vec<MapEntry> {
+    entries
+}
+
+#[uniffi::export]
+fn make_simple_record_list() -> Vec<MapEntry> {
+    vec![MapEntry {
+        key: Value::Bool { value: true },
+        value: Value::Bool { value: false },
+    }]
+}
+
 uniffi::include_scaffolding!("api");

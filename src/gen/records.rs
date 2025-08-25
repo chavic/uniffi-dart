@@ -94,7 +94,11 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
             }
 
             static int allocationSize($cls_name value) {
-                return $(for f in obj.fields() => $(f.as_type().as_codetype().ffi_converter_name()).allocationSize(value.$(DartCodeOracle::var_name(f.name()))) + ) 0;
+                int total = 0;
+                $(for f in obj.fields() =>
+                total += $(f.as_type().as_codetype().ffi_converter_name()).allocationSize(value.$(DartCodeOracle::var_name(f.name())));
+                )
+                return total;
             }
         }
     }

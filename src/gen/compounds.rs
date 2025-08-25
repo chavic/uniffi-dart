@@ -162,7 +162,12 @@ macro_rules! impl_renderable_for_compound {
                                 return offset - buf.offsetInBytes;
                             }
                             static int allocationSize($type_label value) {
-                                return value.map((l) => $inner_cl_converter_name.allocationSize(l)).fold(0, (a, b) => a + b) + 4;
+                                int total = 4; // sequence length
+                                for (var item in value) {
+                                    int itemSize = $inner_cl_converter_name.allocationSize(item);
+                                    total += itemSize;
+                                }
+                                return total;
                             }
 
                             static RustBuffer lower( $type_label value) {
