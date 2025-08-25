@@ -103,6 +103,27 @@ pub fn new_public_key_value(value: Vec<i32>) -> Value {
     Value::PublicKey { value }
 }
 
+// Test functions for 64-bit sequences
+#[uniffi::export]
+pub fn take_i64_list(value: Vec<i64>) -> Vec<i64> {
+    value
+}
+
+#[uniffi::export]
+pub fn take_u64_list(value: Vec<u64>) -> Vec<u64> {
+    value
+}
+
+#[uniffi::export]
+pub fn make_i64_list() -> Vec<i64> {
+    vec![-9223372036854775808, 0, 9223372036854775807]
+}
+
+#[uniffi::export]
+pub fn make_u64_list() -> Vec<u64> {
+    vec![0, 12345678901234567890, 18446744073709551615]
+}
+
 // #[uniffi::export]
 // pub fn new_map(value: HashMap<String, Value>) -> MapEntry {
 //      todo!("Not done")
