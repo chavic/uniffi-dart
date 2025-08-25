@@ -129,7 +129,7 @@ impl Renderable for UInt64CodeType {
 
                 static LiftRetVal<$type_signature> read(Uint8List buf) {
                     final value = buf.buffer.asByteData(buf.offsetInBytes).getUint64(0);
-                    return LiftRetVal(BigInt.from(value), 8);
+                    return LiftRetVal(lift(value), 8);
                 }
 
                 static int lower($type_signature value) {
