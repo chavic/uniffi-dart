@@ -1,6 +1,6 @@
 use super::{callback_interface, compounds, custom, enums, primitives, records};
 use super::{objects, oracle::AsCodeType};
-use genco::{lang::dart, quote};
+use genco::lang::dart;
 use uniffi_bindgen::interface::{AsType, Enum, Object, Record, Type};
 use uniffi_bindgen::ComponentInterface;
 
