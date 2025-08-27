@@ -5,7 +5,7 @@ use paste::paste;
 use uniffi_bindgen::interface::Type;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
-use crate::gen::render::{Renderable, TypeHelperRenderer};
+use crate::gen::render::{AsRenderable, Renderable, TypeHelperRenderer};
 
 macro_rules! impl_code_type_for_compound {
      ($T:ty, $type_label_pattern:literal, $canonical_name_pattern: literal) => {
@@ -47,7 +47,13 @@ macro_rules! impl_renderable_for_compound {
                     let inner_codetype = DartCodeOracle::find(self.inner());
                     let inner_type_label = inner_codetype.type_label();
 
-                    type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
+                    // Add the Inner FFI Converter and ensure it's rendered
+                    let inner_type_rendered = if !type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()) {
+                        // If this is the first time we're seeing this inner type, render it now
+                        self.inner().as_renderable().render_type_helper(type_helper)
+                    } else {
+                        quote!()
+                    };
 
                     let cl_name = &format!($canonical_name_pattern, &inner_codetype.canonical_name());
                     let type_label = &format!($type_label_pattern, &inner_type_label);
@@ -58,6 +64,8 @@ macro_rules! impl_renderable_for_compound {
 
 
                     quote! {
+                        $inner_type_rendered
+
                         class $cl_name {
 
                             static $type_label lift( RustBuffer buf) {
@@ -124,7 +132,13 @@ macro_rules! impl_renderable_for_compound {
                     let inner_codetype = self.inner().as_codetype();
                     let inner_type_label = inner_codetype.type_label();
 
-                    type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()); // Add the Inner FFI Converter
+                    // Add the Inner FFI Converter and ensure it's rendered
+                    let inner_type_rendered = if !type_helper.include_once_check(&inner_codetype.canonical_name(), &self.inner()) {
+                        // If this is the first time we're seeing this inner type, render it now
+                        self.inner().as_renderable().render_type_helper(type_helper)
+                    } else {
+                        quote!()
+                    };
 
                     let cl_name = &format!($canonical_name_pattern, &inner_codetype.canonical_name());
                     let type_label = &format!("List<{}>", &inner_type_label);
@@ -135,6 +149,8 @@ macro_rules! impl_renderable_for_compound {
 
 
                     quote! {
+                        $inner_type_rendered
+
                         class $cl_name {
 
                             static $type_label lift( RustBuffer buf) {
@@ -233,8 +249,19 @@ impl Renderable for MapCodeType {
         let key_codetype = DartCodeOracle::find(self.key());
         let val_codetype = DartCodeOracle::find(self.value());
 
-        type_helper.include_once_check(&key_codetype.canonical_name(), self.key());
-        type_helper.include_once_check(&val_codetype.canonical_name(), self.value());
+        // Add the key and value FFI Converters and ensure they're rendered
+        let key_type_rendered =
+            if !type_helper.include_once_check(&key_codetype.canonical_name(), self.key()) {
+                self.key().as_renderable().render_type_helper(type_helper)
+            } else {
+                quote!()
+            };
+        let val_type_rendered =
+            if !type_helper.include_once_check(&val_codetype.canonical_name(), self.value()) {
+                self.value().as_renderable().render_type_helper(type_helper)
+            } else {
+                quote!()
+            };
 
         let cl_name = &self.ffi_converter_name();
         let key_type_label_owned = key_codetype.type_label();
@@ -248,6 +275,9 @@ impl Renderable for MapCodeType {
         let val_conv = &val_conv_owned;
 
         quote! {
+            $key_type_rendered
+            $val_type_rendered
+
             class $cl_name {
                 static Map<$key_type_label, $val_type_label> lift(RustBuffer buf) {
                     return $cl_name.read(buf.asUint8List()).value;
