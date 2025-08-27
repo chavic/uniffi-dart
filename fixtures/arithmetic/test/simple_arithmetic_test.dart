@@ -24,7 +24,7 @@ void main() {
     expect(addU16(2, 2), 4);
   });
   test('u64', () {
-    expect(addU64(2, 2), 4);
+    expect(addU64(BigInt.from(2), BigInt.from(2)), BigInt.from(4));
   });
 
   test('i8', () {
@@ -37,7 +37,7 @@ void main() {
     expect(addI32(2, 2), 4);
   });
   test('i64', () {
-    expect(addI64(2, 2), 4);
+    expect(addI64(BigInt.from(2), BigInt.from(2)), BigInt.from(4));
   });
   test('f32', () {
     expect(addF32(2.0, 2.0), 4.0);
@@ -53,7 +53,7 @@ void main() {
     expect(getBackU16(4), 4);
   });
   test('get back u64', () {
-    expect(getBackU64(4), 4);
+    expect(getBackU64(BigInt.from(4)), BigInt.from(4));
   });
 
   test('get back  i8', () {
@@ -67,15 +67,15 @@ void main() {
   });
 
   test('divide by zero - success case', () {
-    expect(divideByZero(10, 2), 5);
+    expect(divideByZero(BigInt.from(10), BigInt.from(2)), BigInt.from(5));
   });
 
   test('divide by zero - error case', () {
     expect(
-        () => divideByZero(10, 0), throwsA(isA<DivisionByZeroMathException>()));
+        () => divideByZero(BigInt.from(10), BigInt.zero), throwsA(isA<DivisionByZeroMathException>()));
   });
 
   test('divide by zero - specific error type', () {
-    expect(() => divideByZero(10, 0), throwsA(isA<MathException>()));
+    expect(() => divideByZero(BigInt.from(10), BigInt.zero), throwsA(isA<MathException>()));
   });
 }
