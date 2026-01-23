@@ -24,7 +24,7 @@ class DartGetters extends ForeignGetters {
       throw ReallyBadArgumentComplexException(20); // Example of a complex error
     }
     if (v == 'UnexpectedError') {
-      throw UnexpectedExceptionWithReasonComplexException("something failed");
+      throw UnexpectedErrorWithReasonComplexException("something failed");
     }
     return arg2 ? v?.toUpperCase() : v;
   }

@@ -45,6 +45,19 @@ impl Renderable for CallbackInterfaceCodeType {
             .get_callback_interface_definition(&self.name)
             .unwrap();
 
+        // Ensure converters for all callback argument and return types are generated
+        for method in callback.methods() {
+            for arg in method.arguments() {
+                type_helper.include_once_check(
+                    &arg.as_codetype().canonical_name(),
+                    &arg.as_type(),
+                );
+            }
+            if let Some(ret) = method.return_type() {
+                type_helper.include_once_check(&ret.as_codetype().canonical_name(), ret);
+            }
+        }
+
         // Generate all necessary components for the callback interface
         let interface = generate_callback_interface(
             callback.name(),

@@ -142,7 +142,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         ));
 
         let ffi_call_args = quote!($(for arg in constructor.arguments() =>
-            $(DartCodeOracle::type_lower_fn(&arg.as_type(), quote!($(DartCodeOracle::var_name(arg.name()))))),)
+            $(DartCodeOracle::lower_arg_with_callback_handling(arg)),)
         );
 
         // Ensure argument types are included

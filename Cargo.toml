@@ -73,6 +73,7 @@ members = [
     "fixtures/trait-interfaces",
     "fixtures/dart_async",
     "fixtures/error_types",
+    "fixtures/callbacks",
     #"fixtures/*",
 ]
 

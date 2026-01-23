@@ -75,6 +75,25 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
     // this is so the generator knows what helper code to include.
 
     fn render(&self) -> (dart::Tokens, dart::Tokens) {
+        // Recursively register a type and any nested types for helper generation
+        fn include_type(renderer: &TypeHelpersRenderer<'_>, ty: &Type) {
+            renderer.include_once_check(&ty.as_codetype().canonical_name(), ty);
+            match ty {
+                Type::Optional { inner_type } | Type::Sequence { inner_type } => {
+                    include_type(renderer, inner_type)
+                }
+                Type::Map {
+                    key_type,
+                    value_type,
+                    ..
+                } => {
+                    include_type(renderer, key_type);
+                    include_type(renderer, value_type);
+                }
+                _ => {}
+            }
+        }
+
         // Render all the types and their helpers
         let types_definitions = quote! {
             $( for rec in self.ci.record_definitions() => $(records::generate_record(rec, self)))
@@ -112,10 +131,15 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
         // Ensure callback interfaces are registered for helper generation
         for callback in self.ci.callback_interface_definitions() {
-            self.include_once_check(
-                &callback.as_type().as_codetype().canonical_name(),
-                &callback.as_type(),
-            );
+            include_type(self, &callback.as_type());
+            for method in callback.methods() {
+                for arg in method.arguments() {
+                    include_type(self, &arg.as_type());
+                }
+                if let Some(ret) = method.return_type() {
+                    include_type(self, ret);
+                }
+            }
         }
 
         // Let's include the string converter

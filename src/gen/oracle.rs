@@ -582,13 +582,22 @@ impl DartCodeOracle {
 
     /// Lower argument with special handling for callback traits
     pub fn lower_arg_with_callback_handling(arg: &Argument) -> dart::Tokens {
-        let base_lower = Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name()))));
         match arg.as_type() {
             Type::Object {
                 imp: ObjectImpl::CallbackTrait,
                 ..
-            } => base_lower,
-            _ => base_lower,
+            } => {
+                let converter = arg.as_type().as_codetype().ffi_converter_name();
+                let var_name = Self::var_name(arg.name());
+                // Callback handles are passed across the FFI boundary as u64s, not pointers.
+                quote!($(converter).lower($var_name).address)
+            }
+            Type::CallbackInterface { .. } => {
+                let converter = arg.as_type().as_codetype().ffi_converter_name();
+                let var_name = Self::var_name(arg.name());
+                quote!($(converter).lower($var_name).address)
+            }
+            _ => Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name())))),
         }
     }
 
