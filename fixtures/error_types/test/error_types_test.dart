@@ -8,8 +8,7 @@ void main() {
         oops();
         fail('Must have failed');
       } on ErrorInterface catch (e) {
-        // TODO: Update when Display trait support is added
-        expect(e.toString(), 'ErrorInterface');
+        expect(e.toString(), contains('because uniffi told me so'));
         expect(e.chain().length, 2);
         expect(e.link(0), 'because uniffi told me so');
       }
@@ -20,8 +19,7 @@ void main() {
         oopsNowrap();
         fail('Must have failed');
       } on ErrorInterface catch (e) {
-        // TODO: Update when Display trait support is added
-        expect(e.toString(), 'ErrorInterface');
+        expect(e.toString(), contains('because uniffi told me so'));
         expect(e.chain().length, 2);
         expect(e.link(0), 'because uniffi told me so');
       }
@@ -39,8 +37,7 @@ void main() {
 
     test('Get error instance', () {
       final e = getError('the error');
-      // TODO: Update when Display trait support is added
-      expect(e.toString(), 'ErrorInterface');
+      expect(e.toString(), 'the error');
       expect(e.link(0), 'the error');
     });
 
@@ -49,8 +46,7 @@ void main() {
         throwRich('oh no');
         fail('Must have failed');
       } on RichException catch (e) {
-        // TODO: Update when Display trait support is added
-        expect(e.toString(), 'RichException');
+        expect(e.toString(), 'RichError: "oh no"');
       }
     });
 
@@ -69,7 +65,7 @@ void main() {
         try {
           oopsEnum(1);
         } catch (e) {
-          expect(e.toString(), 'ValueErrorException');
+          expect(e.toString(), 'ValueErrorException(value)');
         }
       });
 
@@ -78,7 +74,7 @@ void main() {
         try {
           oopsEnum(2);
         } catch (e) {
-          expect(e.toString(), 'IntValueErrorException');
+          expect(e.toString(), 'IntValueErrorException(2)');
         }
       });
 
@@ -125,7 +121,7 @@ void main() {
         try {
           oopsTuple(0);
         } catch (e) {
-          expect(e.toString(), 'OopsTupleException');
+          expect(e.toString(), 'OopsTupleException(oops)');
         }
       });
 
@@ -134,25 +130,25 @@ void main() {
         try {
           oopsTuple(1);
         } catch (e) {
-          expect(e.toString(), 'ValueTupleException');
+          expect(e.toString(), 'ValueTupleException(1)');
         }
       });
 
       test('Get tuple with default', () {
         final tuple = getTuple(null);
-        expect(tuple.toString(), 'OopsTupleException');
+        expect(tuple.toString(), 'OopsTupleException(oops)');
         // Remove identity check as it compares instances, not values
         // expect(getTuple(tuple), tuple);
       });
     });
 
-    // test('Async throw error', () async {
-    //   try {
-    //     await aoops();
-    //     fail('Must have failed');
-    //   } on ErrorInterface catch (e) {
-    //     expect(e.toString(), 'async-oops');
-    //   }
-    // });
+    test('Async throw error', () async {
+      try {
+        await aoops();
+        fail('Must have failed');
+      } on ErrorInterface catch (e) {
+        expect(e.toString(), contains('async-oops'));
+      }
+    });
   });
 }

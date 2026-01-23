@@ -532,6 +532,34 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
 
+    let is_error_interface = type_helper.get_ci().is_name_used_as_error(obj.name());
+    let mut implements: Vec<String> = Vec::new();
+    if is_error_interface {
+        implements.push("Exception".to_string());
+    }
+    let implements_clause = if implements.is_empty() {
+        quote!()
+    } else {
+        quote!( implements $(for imp in implements.iter() join (, ) => $(imp)))
+    };
+
+    let has_display_trait = obj
+        .uniffi_traits()
+        .iter()
+        .any(|t| matches!(t, UniffiTrait::Display { .. }));
+
+    let to_string_method: dart::Tokens = if is_error_interface && !has_display_trait {
+        let dart_class_name = format!("\"{cls_name}\"");
+        quote! {
+            @override
+            String toString() {
+                return $(&dart_class_name);
+            }
+        }
+    } else {
+        quote!()
+    };
+
     let abstract_methods = obj
         .methods()
         .into_iter()
@@ -542,8 +570,25 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
         .into_iter()
         .map(|method| generate_method(method, type_helper));
 
+    let error_handler_class = if is_error_interface {
+        let error_handler_name = format!("{cls_name}ErrorHandler");
+        let instance_name = cls_name.to_lower_camel_case();
+        quote! {
+            class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
+                @override
+                Exception lift(RustBuffer errorBuf) {
+                    return $(cls_name).read(errorBuf.asUint8List()).value;
+                }
+            }
+
+            final $(&error_handler_name) $(instance_name)ErrorHandler = $(&error_handler_name)();
+        }
+    } else {
+        quote!()
+    };
+
     quote! {
-        abstract class $cls_name {
+        abstract class $cls_name $implements_clause {
             factory $cls_name.lift(Pointer<Void> ptr) {
                 // UniFFI 0.30.0: Check if handle is from foreign side (lowest bit set)
                 final handle = ptr.address;
@@ -613,8 +658,12 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
                 rustCall((status) => $ffi_object_free_name(_ptr, status));
             }
 
+            $to_string_method
+
             $(for method in concrete_methods => $method)
         }
+
+        $error_handler_class
     }
 }
 
