@@ -272,11 +272,11 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 external Pointer<Uint8> data;
 
                 static RustBuffer alloc(int size) {
-                    return rustCall((status) => $(self.ci.ffi_rustbuffer_alloc().name())(size, status));
+                    return rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_alloc().name())(size, status));
                 }
 
                 static RustBuffer fromBytes(ForeignBytes bytes) {
-                    return rustCall((status) => $(self.ci.ffi_rustbuffer_from_bytes().name())(bytes, status));
+                    return rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_from_bytes().name())(bytes, status));
                 }
 
                 // static RustBuffer from(Pointer<Uint8> bytes, int len) {
@@ -285,11 +285,11 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 // }
 
                 void free() {
-                    rustCall((status) => $(self.ci.ffi_rustbuffer_free().name())(this, status));
+                    rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_free().name())(this, status));
                 }
 
                 RustBuffer reserve(int additionalCapacity) {
-                return rustCall((status) => $(self.ci.ffi_rustbuffer_reserve().name())(this, additionalCapacity, status));
+                return rustCall((status) => $(DartCodeOracle::find_lib_instance()).$(self.ci.ffi_rustbuffer_reserve().name())(this, additionalCapacity, status));
                 }
 
                 Uint8List asUint8List() {

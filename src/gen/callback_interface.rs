@@ -596,7 +596,7 @@ pub fn generate_callback_interface_vtable_init_function(
             })
 
             rustCall((status) {
-                uniffi_$(ffi_module)_fn_init_callback_vtable_$(snake_callback)(
+                $(DartCodeOracle::find_lib_instance()).uniffi_$(ffi_module)_fn_init_callback_vtable_$(snake_callback)(
                     $(vtable_static_instance_name),
                 );
                 checkCallStatus(NullRustCallStatusErrorHandler(), status);

@@ -101,6 +101,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     let interface_name = DartCodeOracle::object_interface_name(type_helper.get_ci(), obj);
     let interface_definition = generate_object_interface(obj, &interface_name, type_helper);
     let finalizer_cls_name = &format!("{cls_name}Finalizer");
+    let lib_instance = &DartCodeOracle::find_lib_instance();
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
 
@@ -157,7 +158,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             async_constructor_factories.push(quote! {
                 static Future<$cls_name> $(DartCodeOracle::fn_name(constructor_name))($dart_params) {
                     return uniffiRustCallAsync(
-                      () => $ffi_func_name(
+                      () => $lib_instance.$ffi_func_name(
                         $ffi_call_args
                       ),
                       $(DartCodeOracle::async_poll(constructor, type_helper.get_ci())),
@@ -172,7 +173,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             constructor_definitions.push(quote! {
                 // Public constructor
                 $dart_constructor_decl($dart_params) : _ptr = rustCall((status) =>
-                    $ffi_func_name(
+                    $lib_instance.$ffi_func_name(
                         $ffi_call_args status
                     ),
                     $error_handler
@@ -257,7 +258,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
         $interface_definition
 
         final _$finalizer_cls_name = Finalizer<Pointer<Void>>((ptr) {
-          rustCall((status) => $ffi_object_free_name(ptr, status));
+          rustCall((status) => $lib_instance.$ffi_object_free_name(ptr, status));
         });
 
         class $cls_name $implements_clause {
@@ -282,7 +283,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             }
 
             Pointer<Void> uniffiClonePointer() {
-                return rustCall((status) => $ffi_object_clone_name(_ptr, status));
+                return rustCall((status) => $lib_instance.$ffi_object_clone_name(_ptr, status));
             }
 
             // A Rust pointer is 8 bytes
@@ -304,7 +305,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
 
             void dispose() {
                 _$finalizer_cls_name.detach(this);
-                rustCall((status) => $ffi_object_free_name(_ptr, status));
+                rustCall((status) => $lib_instance.$ffi_object_free_name(_ptr, status));
             }
 
             $to_string_method
@@ -363,7 +364,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         quote!(
             Future<$ret> $(DartCodeOracle::fn_name(func.name()))($args) {
                 return uniffiRustCallAsync(
-                  () => $(func.ffi_func().name())(
+                  () => $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                     uniffiClonePointer(),
                     $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),)
                   ),
@@ -380,7 +381,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         quote!(
             $ret $(DartCodeOracle::fn_name(func.name()))($args) {
                 return rustCall((status) {
-                    $(func.ffi_func().name())(
+                    $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                     );
@@ -391,7 +392,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
         quote!(
             $ret $(DartCodeOracle::fn_name(func.name()))($args) {
                 return rustCallWithLifter(
-                    (status) => $(func.ffi_func().name())(
+                    (status) => $(DartCodeOracle::find_lib_instance()).$(func.ffi_func().name())(
                         uniffiClonePointer(),
                         $(for arg in &func.arguments() => $(DartCodeOracle::lower_arg_with_callback_handling(arg)),) status
                     ),
@@ -486,6 +487,7 @@ fn trait_method_call(
 ) -> dart::Tokens {
     assert_eq!(method.arguments().len(), arg_exprs.len());
 
+    let lib_instance = DartCodeOracle::find_lib_instance();
     let ffi_name = method.ffi_func().name();
 
     let error_handler = if let Some(error_type) = method.throws_type() {
@@ -507,7 +509,7 @@ fn trait_method_call(
         let lifter = quote!($(ret.as_codetype().lift()));
         quote!(
             rustCallWithLifter(
-                (status) => $ffi_name(
+                (status) => $lib_instance.$ffi_name(
                     uniffiClonePointer(),
                     $(for arg in lowered_args => $arg,)
                     status
@@ -519,7 +521,7 @@ fn trait_method_call(
     } else {
         quote!(
             rustCall((status) {
-                $ffi_name(
+                $lib_instance.$ffi_name(
                     uniffiClonePointer(),
                     $(for arg in lowered_args => $arg,)
                     status
@@ -535,6 +537,7 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
     let cls_name = &DartCodeOracle::class_name(obj.name());
     let impl_name = format!("_{cls_name}Impl");
     let finalizer_field = format!("_{cls_name}ImplFinalizer");
+    let lib_instance = &DartCodeOracle::find_lib_instance();
 
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
@@ -603,7 +606,7 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
 
             static final Finalizer<Pointer<Void>> $(&finalizer_field) =
                 Finalizer<Pointer<Void>>((ptr) {
-                    rustCall((status) => $ffi_object_free_name(ptr, status));
+                    rustCall((status) => $lib_instance.$ffi_object_free_name(ptr, status));
                 });
 
             Pointer<Void> _ptr;
@@ -611,13 +614,13 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
             static int allocationSize($(&impl_name) _) => 8;
 
             Pointer<Void> uniffiClonePointer() {
-                return rustCall((status) => $ffi_object_clone_name(_ptr, status));
+                return rustCall((status) => $lib_instance.$ffi_object_clone_name(_ptr, status));
             }
 
             @override
             void dispose() {
                 $(&finalizer_field).detach(this);
-                rustCall((status) => $ffi_object_free_name(_ptr, status));
+                rustCall((status) => $lib_instance.$ffi_object_free_name(_ptr, status));
             }
 
             $(for method in concrete_methods => $method)
