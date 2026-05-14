@@ -36,6 +36,53 @@ Run all fixture tests:
 cargo nextest run --all --nocapture
 ```
 
+### Nix Development Shells
+
+If Nix is available, the repository provides development shells with Rust,
+Dart, `cargo-nextest`, and formatting tools:
+
+Enable flakes and the new Nix CLI if they are not already enabled:
+
+```bash
+mkdir -p ~/.config/nix
+printf "experimental-features = nix-command flakes\n" >> ~/.config/nix/nix.conf
+```
+
+```bash
+nix develop
+nix develop .#msrv
+nix develop .#stable
+nix develop .#nightly
+```
+
+The default shell tracks the stable Rust toolchain. The `.#msrv` shell matches
+the declared Rust MSRV, currently 1.85.0.
+
+Run formatting through the flake:
+
+```bash
+nix fmt -- --ci
+```
+
+The flake formatter is currently scoped to Nix files only. Rust, Dart, and
+fixture formatting are left to the existing project commands to avoid unrelated
+format-only churn.
+
+Run the flake checks:
+
+```bash
+nix flake check
+```
+
+CI uses this as a Nix smoke check. The existing GitHub Actions workflows remain
+the authoritative full Rust, Dart, lint, and downstream test suite.
+
+Run the existing fixture test suite from a Nix shell:
+
+```bash
+nix develop .#msrv -c cargo nextest run --all
+```
+
 Run specific fixture tests:
 
 ```bash

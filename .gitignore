@@ -1,9 +1,12 @@
 /target
+/result
+/result-*
 /uniffi-rs
 /Cargo.lock
 experiments/*
 og-fixtures/*
 .vscode/*
+.direnv/
 .aider*
 .dart_tool/*
 **/.dart_tool/*
