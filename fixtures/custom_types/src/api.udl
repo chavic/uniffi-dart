@@ -1,16 +1,18 @@
 [Custom]
-typedef string Url;
+typedef bytes JsonBuffer;
 
-[Custom]
-typedef i64 Handle;
+dictionary ZenEngineTrace {
+    string id;
+    JsonBuffer value;
+};
 
-[Custom]
-typedef i64 TimeIntervalMs;
+dictionary ZenEngineResponse {
+    string performance;
+    JsonBuffer result;
+    record<string, ZenEngineTrace>? trace;
+};
 
-[Custom]
-typedef f64 TimeIntervalSecDbl;
-
-[Custom]
-typedef f32 TimeIntervalSecFlt;
-
-namespace custom_types { };
+namespace custom_types {
+    ZenEngineResponse get_zen_engine_response();
+    ZenEngineResponse return_zen_engine_response(ZenEngineResponse response);
+};

@@ -1,104 +1,39 @@
-// use uniffi;
-// use url::Url;
+use std::collections::HashMap;
 
-// pub struct Handle(pub i64);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JsonBuffer(pub Vec<u8>);
 
-// pub struct TimeIntervalMs(pub i64);
+uniffi::custom_newtype!(JsonBuffer, Vec<u8>);
 
-// pub struct TimeIntervalSecDbl(pub f64);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZenEngineTrace {
+    pub id: String,
+    pub value: JsonBuffer,
+}
 
-// pub struct TimeIntervalSecFlt(pub f32);
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ZenEngineResponse {
+    pub performance: String,
+    pub result: JsonBuffer,
+    pub trace: Option<HashMap<String, ZenEngineTrace>>,
+}
 
-// impl UniffiCustomTypeConverter for Handle {
-//     // The `Builtin` type will be used to marshall values across the FFI
-//     type Builtin = i64;
+pub fn get_zen_engine_response() -> ZenEngineResponse {
+    ZenEngineResponse {
+        performance: "ready".to_string(),
+        result: JsonBuffer(vec![1, 2, 3]),
+        trace: Some(HashMap::from([(
+            "primary".to_string(),
+            ZenEngineTrace {
+                id: "primary".to_string(),
+                value: JsonBuffer(vec![4, 5, 6]),
+            },
+        )])),
+    }
+}
 
-//     // Convert Builtin to our custom type
-//     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-//         Ok(Handle(val))
-//     }
+pub fn return_zen_engine_response(response: ZenEngineResponse) -> ZenEngineResponse {
+    response
+}
 
-//     // Convert our custom type to Builtin
-//     fn from_custom(obj: Self) -> Self::Builtin {
-//         obj.0
-//     }
-// }
-
-// impl UniffiCustomTypeConverter for Url {
-//     type Builtin = String;
-
-//     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-//         Ok(Url::parse(&val)?)
-//     }
-
-//     fn from_custom(obj: Self) -> Self::Builtin {
-//         obj.into()
-//     }
-// }
-
-// impl UniffiCustomTypeConverter for TimeIntervalMs {
-//     // The `Builtin` type will be used to marshall values across the FFI
-//     type Builtin = i64;
-
-//     // Convert Builtin to our custom type
-//     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-//         Ok(TimeIntervalMs(val))
-//     }
-
-//     // Convert our custom type to Builtin
-//     fn from_custom(obj: Self) -> Self::Builtin {
-//         obj.0
-//     }
-// }
-
-// impl UniffiCustomTypeConverter for TimeIntervalSecDbl {
-//     // The `Builtin` type will be used to marshall values across the FFI
-//     type Builtin = f64;
-
-//     // Convert Builtin to our custom type
-//     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-//         Ok(TimeIntervalSecDbl(val))
-//     }
-
-//     // Convert our custom type to Builtin
-//     fn from_custom(obj: Self) -> Self::Builtin {
-//         obj.0
-//     }
-// }
-
-// impl UniffiCustomTypeConverter for TimeIntervalSecFlt {
-//     // The `Builtin` type will be used to marshall values across the FFI
-//     type Builtin = f32;
-
-//     // Convert Builtin to our custom type
-//     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-//         Ok(TimeIntervalSecFlt(val))
-//     }
-
-//     // Convert our custom type to Builtin
-//     fn from_custom(obj: Self) -> Self::Builtin {
-//         obj.0
-//     }
-// }
-
-// #[derive(uniffi::Record)]
-// pub struct CustomTypesDemo {
-//     url: Url,
-//     handle: Handle,
-//     time_interval_ms: TimeIntervalMs,
-//     time_interval_sec_dbl: TimeIntervalSecDbl,
-//     time_interval_sec_flt: TimeIntervalSecFlt,
-// }
-
-// #[uniffi::export]
-// pub fn get_custom_types_demo(v: Option<CustomTypesDemo>) -> CustomTypesDemo {
-//     v.unwrap_or_else(|| CustomTypesDemo {
-//         url: Url::parse("http://example.com/").unwrap(),
-//         handle: Handle(123),
-//         time_interval_ms: TimeIntervalMs(456000),
-//         time_interval_sec_dbl: TimeIntervalSecDbl(456.0),
-//         time_interval_sec_flt: TimeIntervalSecFlt(777.0),
-//     })
-// }
-
-// uniffi::include_scaffolding!("api");
+uniffi::include_scaffolding!("api");

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use genco::prelude::*;
-use uniffi_bindgen::interface::AsType;
+use uniffi_bindgen::interface::{AsType, Callable};
 use uniffi_bindgen::{interface::Type, ComponentInterface};
 
 use super::render::{AsRenderable, Renderer, TypeHelperRenderer};
@@ -29,6 +29,62 @@ impl<'a> TypeHelpersRenderer<'a> {
 
     pub fn get_include_names(&self) -> BTreeMap<String, Type> {
         self.include_once_names.clone().into_inner()
+    }
+
+    fn register_type_helper(&self, ty: &Type) {
+        let canonical_name = ty.as_codetype().canonical_name();
+        self.include_once_check(&canonical_name, ty);
+
+        let exception_safe_name = DartCodeOracle::exception_safe_name(&canonical_name);
+        if exception_safe_name != canonical_name {
+            self.include_once_check(&exception_safe_name, ty);
+        }
+    }
+
+    fn register_type_helpers(&self, ty: &Type) {
+        for ty in ty.iter_types() {
+            self.register_type_helper(ty);
+        }
+    }
+
+    fn register_callable_type_helpers(&self, callable: &dyn Callable) {
+        for ty in callable.iter_types() {
+            self.register_type_helper(ty);
+        }
+    }
+
+    fn register_component_interface_type_helpers(&self) {
+        for record in self.ci.record_definitions() {
+            self.register_type_helpers(&record.as_type());
+            for ty in record.iter_types() {
+                self.register_type_helpers(ty);
+            }
+        }
+
+        for enm in self.ci.enum_definitions() {
+            self.register_type_helpers(&enm.as_type());
+            for ty in enm.iter_types() {
+                self.register_type_helpers(ty);
+            }
+        }
+
+        for obj in self.ci.object_definitions() {
+            self.register_type_helpers(&obj.as_type());
+            for ty in obj.iter_types() {
+                self.register_type_helpers(ty);
+            }
+        }
+
+        for func in self.ci.function_definitions() {
+            self.register_callable_type_helpers(func);
+        }
+
+        for callback in self.ci.callback_interface_definitions() {
+            self.register_type_helpers(&callback.as_type());
+            for ty in callback.iter_types() {
+                self.register_type_helpers(ty);
+            }
+        }
     }
 }
 
@@ -110,32 +166,10 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             )
         );
 
-        // Ensure callback interfaces and their method parameter/return types
-        // are registered for helper generation. We must do this before taking
-        // the snapshot in get_include_names(), so that compound types like
-        // Sequence<Record> or Optional<Record> that only appear in callback
-        // interface signatures get their FfiConverter classes generated.
-        for callback in self.ci.callback_interface_definitions() {
-            self.include_once_check(
-                &callback.as_type().as_codetype().canonical_name(),
-                &callback.as_type(),
-            );
-            // Walk callback method signatures to register compound types
-            for method in callback.methods() {
-                for arg in method.arguments() {
-                    arg.as_renderable().render_type(&arg.as_type(), self);
-                }
-                if let Some(ret) = method.return_type() {
-                    ret.as_renderable().render_type(ret, self);
-                }
-                if let Some(error_type) = method.throws_type() {
-                    error_type.as_renderable().render_type(error_type, self);
-                }
-            }
-        }
+        self.register_component_interface_type_helpers();
 
         // Let's include the string converter
-        self.include_once_check(&Type::String.as_codetype().canonical_name(), &Type::String);
+        self.register_type_helpers(&Type::String);
         let helpers_definitions = quote! {
             $(for (_, ty) in self.get_include_names().iter() => $(ty.as_renderable().render_type_helper(self)) )
         };
