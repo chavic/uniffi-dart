@@ -1,4 +1,5 @@
 use std::sync::Arc;
+
 use uniffi;
 
 #[derive(uniffi::Record, Clone)]
@@ -9,10 +10,7 @@ pub struct WorldState {
 
 impl WorldState {
     fn new(name: Option<String>) -> WorldState {
-        WorldState {
-            inhabitants: 0,
-            name,
-        }
+        WorldState { inhabitants: 0, name }
     }
 }
 

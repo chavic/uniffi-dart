@@ -1,5 +1,6 @@
-use crate::{BasicError, Object, RecordWithBytes};
 use std::sync::Arc;
+
+use crate::{BasicError, Object, RecordWithBytes};
 
 #[uniffi::export(with_foreign)]
 pub trait TestCallbackInterface: Send + Sync {

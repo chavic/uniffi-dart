@@ -59,21 +59,11 @@ pub enum LargeError {
     Case31 { arg1: ErrorPayload },
 
     #[error("Important debug description of what went wrong, arg1: '{arg1}', arg2: '{arg2}', arg3: '{arg3}', arg4: '{arg4}'")]
-    Case40 {
-        arg1: ErrorPayload,
-        arg2: ErrorPayload,
-        arg3: ErrorPayload,
-        arg4: ErrorPayload,
-    },
+    Case40 { arg1: ErrorPayload, arg2: ErrorPayload, arg3: ErrorPayload, arg4: ErrorPayload },
 
     // ... (abbreviated from 100 cases to show pattern)
     #[error("Important debug description of what went wrong, arg1: '{arg1}', arg2: '{arg2}', arg3: '{arg3}', arg4: '{arg4}'")]
-    Case100 {
-        arg1: ErrorPayload,
-        arg2: ErrorPayload,
-        arg3: ErrorPayload,
-        arg4: ErrorPayload,
-    },
+    Case100 { arg1: ErrorPayload, arg2: ErrorPayload, arg3: ErrorPayload, arg4: ErrorPayload },
 }
 
 impl LargeError {

@@ -26,26 +26,18 @@ impl From<anyhow::Error> for ErrorInterface {
 // Test an interface as the error type
 fn oops() -> Result<(), Arc<ErrorInterface>> {
     // must do explicit conversion to convert anyhow::Error into ErrorInterface
-    Err(Arc::new(
-        anyhow::Error::msg("oops")
-            .context("because uniffi told me so")
-            .into(),
-    ))
+    Err(Arc::new(anyhow::Error::msg("oops").context("because uniffi told me so").into()))
 }
 
 // Like `oops`, but let UniFFI handle wrapping the interface with an arc
 fn oops_nowrap() -> Result<(), ErrorInterface> {
     // must do explicit conversion to convert anyhow::Error into ErrorInterface
-    Err(anyhow::Error::msg("oops")
-        .context("because uniffi told me so")
-        .into())
+    Err(anyhow::Error::msg("oops").context("because uniffi told me so").into())
 }
 
 #[uniffi::export]
 fn toops() -> Result<(), Arc<dyn ErrorTrait>> {
-    Err(Arc::new(ErrorTraitImpl {
-        m: "trait-oops".to_string(),
-    }))
+    Err(Arc::new(ErrorTraitImpl { m: "trait-oops".to_string() }))
 }
 
 #[uniffi::export]
@@ -99,11 +91,7 @@ impl TestInterface {
     }
 
     fn oops(&self) -> Result<(), Arc<ErrorInterface>> {
-        Err(Arc::new(
-            anyhow::Error::msg("oops")
-                .context("because the interface told me so")
-                .into(),
-        ))
+        Err(Arc::new(anyhow::Error::msg("oops").context("because the interface told me so").into()))
     }
 }
 
@@ -193,25 +181,17 @@ fn oops_enum(i: u16) -> Result<(), Error> {
     if i == 0 {
         Err(Error::Oops)
     } else if i == 1 {
-        Err(Error::Value {
-            value: "value".to_string(),
-        })
+        Err(Error::Value { value: "value".to_string() })
     } else if i == 2 {
         Err(Error::IntValue { value: i })
     } else if i == 3 {
-        Err(Error::FlatInnerError {
-            error: FlatInner::CaseA("inner".to_string()),
-        })
+        Err(Error::FlatInnerError { error: FlatInner::CaseA("inner".to_string()) })
     } else if i == 4 {
         Err(Error::FlatInnerError {
-            error: FlatInner::CaseB(NonUniffiType {
-                v: "value".to_string(),
-            }),
+            error: FlatInner::CaseB(NonUniffiType { v: "value".to_string() }),
         })
     } else if i == 5 {
-        Err(Error::InnerError {
-            error: Inner::CaseA("inner".to_string()),
-        })
+        Err(Error::InnerError { error: Inner::CaseA("inner".to_string()) })
     } else {
         panic!("unknown variant {i}")
     }

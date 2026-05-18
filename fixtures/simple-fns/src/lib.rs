@@ -50,9 +50,7 @@ pub struct MyHashSet {
 
 impl MyHashSet {
     pub fn new() -> Self {
-        Self {
-            inner: Mutex::new(HashSet::new()),
-        }
+        Self { inner: Mutex::new(HashSet::new()) }
     }
 
     pub fn add(&self, value: String) {

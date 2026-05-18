@@ -1,8 +1,8 @@
-use uniffi;
-
-use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+
+use once_cell::sync::Lazy;
+use uniffi;
 
 static LIVE_COUNT: Lazy<RwLock<i32>> = Lazy::new(|| RwLock::new(0));
 
@@ -56,16 +56,12 @@ fn get_resource() -> Arc<Resource> {
 
 #[uniffi::export]
 fn get_resource_journal_list() -> ResourceJournalList {
-    ResourceJournalList {
-        resources: vec![get_resource(), get_resource()],
-    }
+    ResourceJournalList { resources: vec![get_resource(), get_resource()] }
 }
 
 #[uniffi::export]
 fn get_resource_journal_map() -> ResourceJournalMap {
-    ResourceJournalMap {
-        resources: HashMap::from([(1, get_resource()), (2, get_resource())]),
-    }
+    ResourceJournalMap { resources: HashMap::from([(1, get_resource()), (2, get_resource())]) }
 }
 
 #[uniffi::export]
@@ -77,9 +73,7 @@ fn get_resource_journal_map_list() -> ResourceJournalMapList {
 
 #[uniffi::export]
 fn get_maybe_resource_journal() -> MaybeResourceJournal {
-    MaybeResourceJournal::Some {
-        resource: get_resource_journal_list(),
-    }
+    MaybeResourceJournal::Some { resource: get_resource_journal_list() }
 }
 
 uniffi::include_scaffolding!("api");

@@ -1,15 +1,11 @@
-use crate::gen::CodeType;
 use genco::prelude::*;
 use heck::ToUpperCamelCase;
-use uniffi_bindgen::interface::Type;
-use uniffi_bindgen::interface::{
-    ffi::{FfiStruct, FfiType},
-    AsType, Method,
-};
+use uniffi_bindgen::interface::ffi::{FfiStruct, FfiType};
+use uniffi_bindgen::interface::{AsType, Method, Type};
 
 use crate::gen::oracle::{AsCodeType, DartCodeOracle};
-use crate::gen::render::AsRenderable;
-use crate::gen::render::{Renderable, TypeHelperRenderer};
+use crate::gen::render::{AsRenderable, Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 
 #[derive(Debug)]
 pub struct CallbackInterfaceCodeType {
@@ -40,10 +36,7 @@ impl CodeType for CallbackInterfaceCodeType {
 impl Renderable for CallbackInterfaceCodeType {
     fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
         type_helper.include_once_check(&self.canonical_name(), &self.self_type);
-        let callback = type_helper
-            .get_ci()
-            .get_callback_interface_definition(&self.name)
-            .unwrap();
+        let callback = type_helper.get_ci().get_callback_interface_definition(&self.name).unwrap();
 
         // Generate all necessary components for the callback interface
         let interface = generate_callback_interface(
@@ -88,9 +81,8 @@ pub fn generate_callback_interface(
     let cls_name = &DartCodeOracle::class_name(callback_name);
     let ffi_conv_name = &DartCodeOracle::class_name(ffi_converter_name);
     let init_fn_name = &format!("init{callback_name}VTable");
-    let lift_rust_impl = rust_impl_name
-        .map(|name| quote!(return $name._internal(handle);))
-        .unwrap_or_else(|| {
+    let lift_rust_impl =
+        rust_impl_name.map(|name| quote!(return $name._internal(handle);)).unwrap_or_else(|| {
             quote!(
                 throw UniffiInternalError(
                     UniffiInternalError.unexpectedStaleHandle,
@@ -119,10 +111,8 @@ pub fn generate_callback_interface(
             let struct_name = struct_def.name().to_string();
 
             if !type_helper.include_once_by_name(&struct_name) {
-                async_struct_defs.push(generate_foreign_future_struct_definition(
-                    &struct_def,
-                    type_helper,
-                ));
+                async_struct_defs
+                    .push(generate_foreign_future_struct_definition(&struct_def, type_helper));
             }
 
             let completion_name = foreign_future_completion_name(method);

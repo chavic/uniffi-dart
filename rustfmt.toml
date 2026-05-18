@@ -1,0 +1,23 @@
+## Based on https://github.com/payjoin/rust-payjoin/blob/master/rustfmt.toml
+##
+## Keep this to stable rustfmt options because this repository's lint matrix runs
+## `cargo fmt --all -- --check` on MSRV, stable, and nightly Rust.
+
+hard_tabs = false
+tab_spaces = 4
+newline_style = "Auto"
+
+max_width = 100
+use_small_heuristics = "Max"
+
+reorder_imports = true
+reorder_modules = true
+remove_nested_parens = true
+fn_params_layout = "Tall"
+match_block_trailing_comma = false
+edition = "2021"
+merge_derives = true
+use_try_shorthand = false
+use_field_init_shorthand = false
+force_explicit_abi = true
+disable_all_formatting = false

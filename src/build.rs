@@ -1,6 +1,7 @@
+use std::env;
+
 use anyhow::{Context, Result};
 use camino::Utf8Path;
-use std::env;
 
 pub fn generate_scaffolding(udl_file: &Utf8Path) -> Result<()> {
     uniffi_build::generate_scaffolding(udl_file)?;

@@ -1,4 +1,3 @@
-use crate::gen::CodeType;
 use genco::lang::dart;
 use genco::prelude::*;
 use paste::paste;
@@ -6,6 +5,7 @@ use uniffi_bindgen::interface::Type;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
 use crate::gen::render::{AsRenderable, Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 
 macro_rules! impl_code_type_for_compound {
      ($T:ty, $type_label_pattern:literal, $canonical_name_pattern: literal) => {
@@ -254,11 +254,7 @@ pub struct MapCodeType {
 
 impl MapCodeType {
     pub fn new(self_type: Type, key: Type, value: Type) -> Self {
-        Self {
-            self_type,
-            key,
-            value,
-        }
+        Self { self_type, key, value }
     }
 
     fn key(&self) -> &Type {

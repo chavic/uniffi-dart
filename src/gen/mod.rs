@@ -1,23 +1,20 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::process::Command;
 
 use anyhow::{bail, Context, Result};
 use camino::{Utf8Path, Utf8PathBuf};
 use cargo_metadata::Metadata;
-
 use genco::fmt;
 use genco::prelude::*;
 use serde::{Deserialize, Serialize};
 use toml;
-use uniffi_bindgen::BindgenCrateConfigSupplier;
-use uniffi_bindgen::Component;
+use uniffi_bindgen::{BindgenCrateConfigSupplier, BindingGenerator, Component, ComponentInterface};
+
 // use uniffi_bindgen::MergeWith;
 use self::render::Renderer;
 use self::types::TypeHelpersRenderer;
 use crate::gen::oracle::DartCodeOracle;
-use uniffi_bindgen::{BindingGenerator, ComponentInterface};
 
 mod callback_interface;
 mod code_type;
@@ -93,11 +90,7 @@ pub struct DartWrapper<'a> {
 impl<'a> DartWrapper<'a> {
     pub fn new(ci: &'a ComponentInterface, config: &'a Config) -> Self {
         let type_renderer = TypeHelpersRenderer::new(ci);
-        DartWrapper {
-            ci,
-            config,
-            type_renderer,
-        }
+        DartWrapper { ci, config, type_renderer }
     }
 
     fn generate(&self) -> dart::Tokens {
@@ -252,10 +245,7 @@ impl BindingGenerator for DartBindingGenerator {
         // Run full Dart formatter on the output directory as a best-effort step.
         // This is non-fatal: failures will only emit a warning.
         let mut format_command = Command::new("dart");
-        format_command
-            .current_dir(&settings.out_dir)
-            .arg("format")
-            .arg(".");
+        format_command.current_dir(&settings.out_dir).arg("format").arg(".");
         match format_command.spawn().and_then(|mut c| c.wait()) {
             Ok(status) if status.success() => {}
             Ok(_) | Err(_) => {
@@ -268,12 +258,10 @@ impl BindingGenerator for DartBindingGenerator {
     }
 
     fn new_config(&self, root_toml: &toml::value::Value) -> Result<Self::Config> {
-        Ok(
-            match root_toml.get("bindings").and_then(|b| b.get("dart")) {
-                Some(v) => v.clone().try_into()?,
-                None => Default::default(),
-            },
-        )
+        Ok(match root_toml.get("bindings").and_then(|b| b.get("dart")) {
+            Some(v) => v.clone().try_into()?,
+            None => Default::default(),
+        })
     }
 
     fn update_component_configs(
@@ -283,10 +271,7 @@ impl BindingGenerator for DartBindingGenerator {
     ) -> Result<()> {
         for c in &mut *components {
             c.config.cdylib_name.get_or_insert_with(|| {
-                settings
-                    .cdylib
-                    .clone()
-                    .unwrap_or_else(|| format!("uniffi_{}", c.ci.namespace()))
+                settings.cdylib.clone().unwrap_or_else(|| format!("uniffi_{}", c.ci.namespace()))
             });
         }
         Ok(())
@@ -330,17 +315,12 @@ impl ConfigFileSupplier {
                             && !t.is_custom_build()
                     })
                     .filter_map(|t| {
-                        p.manifest_path
-                            .parent()
-                            .map(|p| (t.name.replace('-', "_"), p.to_owned()))
+                        p.manifest_path.parent().map(|p| (t.name.replace('-', "_"), p.to_owned()))
                     })
             })
             .collect();
 
-        Self {
-            config_file_path,
-            crate_paths,
-        }
+        Self { config_file_path, crate_paths }
     }
 }
 
@@ -376,9 +356,7 @@ impl BindgenCrateConfigSupplier for ConfigFileSupplier {
 
     fn get_toml_path(&self, crate_name: &str) -> Option<Utf8PathBuf> {
         // This implementation matches uniffi_bindgen's CrateConfigSupplier::get_toml_path
-        self.crate_paths
-            .get(crate_name)
-            .map(|p| p.join("uniffi.toml"))
+        self.crate_paths.get(crate_name).map(|p| p.join("uniffi.toml"))
     }
 }
 

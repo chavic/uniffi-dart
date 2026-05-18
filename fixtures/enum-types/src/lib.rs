@@ -44,9 +44,7 @@ pub struct AnimalRecord {
 
 impl AnimalRecord {
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-        }
+        Self { name: name.to_string() }
     }
 }
 
@@ -58,9 +56,7 @@ pub struct AnimalObject {
 
 impl AnimalObject {
     pub fn new(name: &str) -> Self {
-        Self {
-            value: AnimalRecord::new(name),
-        }
+        Self { value: AnimalRecord::new(name) }
     }
 }
 

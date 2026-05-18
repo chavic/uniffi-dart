@@ -1,7 +1,9 @@
+use std::pin::Pin;
+use std::time::Duration;
+
 use async_stream::stream;
 use futures::stream::{self, Stream, StreamExt};
 use smol::Timer;
-use std::{pin::Pin, time::Duration};
 
 // // Define custom error enums
 // #[derive(Debug, thiserror::Error)]
@@ -55,9 +57,7 @@ pub fn async_timer_stream() -> Pin<Box<dyn Stream<Item = u64> + Send>> {
 #[uniffi_dart::export_stream(String)]
 pub fn combined_streams() -> impl Stream<Item = String> + Send {
     let stream1 = count_stream().take(5).map(|n| format!("Count: {}", n));
-    let stream3 = fibonacci_stream()
-        .take(5)
-        .map(|n| format!("Fibonacci: {}", n));
+    let stream3 = fibonacci_stream().take(5).map(|n| format!("Fibonacci: {}", n));
 
     stream::select(stream1, stream3)
 }
@@ -122,9 +122,10 @@ pub fn combined_streams() -> impl Stream<Item = String> + Send {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures::stream::StreamExt;
     use smol::block_on;
+
+    use super::*;
 
     #[test]
     fn test_simple_stream() {

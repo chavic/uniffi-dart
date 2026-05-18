@@ -1,11 +1,12 @@
+use genco::prelude::*;
+use uniffi_bindgen::interface::{AsType, Record, Type};
+use uniffi_bindgen::pipeline::general::nodes::Literal as PipelineLiteral;
+
 use super::oracle::{AsCodeType, DartCodeOracle};
 use super::primitives::render_interface_default_value;
 use super::render::{Renderable, TypeHelperRenderer};
 use super::types::generate_type;
 use crate::gen::CodeType;
-use genco::prelude::*;
-use uniffi_bindgen::interface::{AsType, Record, Type};
-use uniffi_bindgen::pipeline::general::nodes::Literal as PipelineLiteral;
 
 #[derive(Debug)]
 pub struct RecordCodeType {

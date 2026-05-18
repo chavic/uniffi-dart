@@ -2,11 +2,10 @@ use genco::prelude::*;
 use heck::ToLowerCamelCase;
 use uniffi_bindgen::interface::{AsType, Function};
 
-use crate::gen::oracle::DartCodeOracle;
-use crate::gen::render::AsRenderable;
-
 use super::oracle::AsCodeType;
 use super::render::TypeHelperRenderer;
+use crate::gen::oracle::DartCodeOracle;
+use crate::gen::render::AsRenderable;
 
 pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
     let args = if func.arguments().is_empty() {
@@ -16,10 +15,7 @@ pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) 
     };
 
     let (ret, lifter) = if let Some(ret) = func.return_type() {
-        (
-            ret.as_renderable().render_type(ret, type_helper),
-            quote!($(ret.as_codetype().lift())),
-        )
+        (ret.as_renderable().render_type(ret, type_helper), quote!($(ret.as_codetype().lift())))
     } else {
         (quote!(void), quote!((_) {}))
     };

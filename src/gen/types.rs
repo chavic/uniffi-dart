@@ -2,11 +2,12 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
 use genco::prelude::*;
-use uniffi_bindgen::interface::AsType;
-use uniffi_bindgen::{interface::Type, ComponentInterface};
+use uniffi_bindgen::interface::{AsType, Type};
+use uniffi_bindgen::ComponentInterface;
 
+use super::oracle::AsCodeType;
 use super::render::{AsRenderable, Renderer, TypeHelperRenderer};
-use super::{enums, functions, objects, oracle::AsCodeType, records};
+use super::{enums, functions, objects, records};
 use crate::gen::oracle::DartCodeOracle;
 
 type FunctionDefinition = dart::Tokens;
@@ -88,9 +89,7 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             .ci
             .iter_external_types()
             .map(|ty| {
-                self.ci
-                    .namespace_for_type(ty)
-                    .expect("external type should have module_path")
+                self.ci.namespace_for_type(ty).expect("external type should have module_path")
             })
             .collect::<BTreeSet<_>>();
         // The second import statement uses a library prefix, to distinguish conflicting identifiers e.g. RustBuffer vs. ext.RustBuffer
@@ -566,10 +565,9 @@ pub fn generate_type(ty: &Type) -> dart::Tokens {
         Type::Boolean => quote!(bool),
         Type::Optional { inner_type } => quote!($(generate_type(inner_type))?),
         Type::Sequence { inner_type } => quote!(List<$(generate_type(inner_type))>),
-        Type::Map {
-            key_type,
-            value_type,
-        } => quote!(Map<$(generate_type(key_type)), $(generate_type(value_type))>),
+        Type::Map { key_type, value_type } => {
+            quote!(Map<$(generate_type(key_type)), $(generate_type(value_type))>)
+        }
         Type::Enum { name, .. } => quote!($(DartCodeOracle::class_name(name))),
         Type::Duration => quote!(Duration),
         Type::Record { name, .. } => quote!($name),

@@ -1,4 +1,3 @@
-use crate::gen::CodeType;
 use genco::prelude::*;
 use heck::ToLowerCamelCase;
 use uniffi_bindgen::interface::{AsType, Enum, Field, Type};
@@ -6,6 +5,7 @@ use uniffi_bindgen::pipeline::general::nodes::Literal;
 
 use super::oracle::{AsCodeType, DartCodeOracle};
 use super::render::{AsRenderable, Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 
 #[derive(Debug)]
 pub struct EnumCodeType {
@@ -29,11 +29,7 @@ impl CodeType for EnumCodeType {
 
     fn literal(&self, literal: &Literal) -> String {
         if let Literal::Enum(v, _) = literal {
-            format!(
-                "{}{}",
-                self.type_label(),
-                DartCodeOracle::enum_variant_name(v)
-            )
+            format!("{}{}", self.type_label(), DartCodeOracle::enum_variant_name(v))
         } else {
             unreachable!();
         }
@@ -62,11 +58,8 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
     let ffi_converter_name = &obj.as_codetype().ffi_converter_name();
     if obj.is_flat() {
         let is_error_enum = type_helper.get_ci().is_name_used_as_error(obj.name());
-        let implements_exception = if is_error_enum {
-            quote!( implements Exception)
-        } else {
-            quote!()
-        };
+        let implements_exception =
+            if is_error_enum { quote!( implements Exception) } else { quote!() };
 
         // For flat error enums, generate an error handler
         let error_handler_class = if is_error_enum {
@@ -152,11 +145,7 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
                 .replace("Error", "Exception")
         }
         fn field_ffi_converter_name(field: &Field) -> String {
-            field
-                .as_type()
-                .as_codetype()
-                .ffi_converter_name()
-                .replace("Error", "Exception")
+            field.as_type().as_codetype().ffi_converter_name().replace("Error", "Exception")
         }
         fn is_flat_enum(field: &Field, type_helper: &dyn TypeHelperRenderer) -> bool {
             if let Type::Enum { name, .. } = &field.as_type() {
@@ -171,11 +160,8 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
             for f in variant_obj.fields() {
                 type_helper.include_once_check(&f.as_codetype().canonical_name(), &f.as_type());
             }
-            let variant_dart_cls_name = &format!(
-                "{}{}",
-                DartCodeOracle::class_name(variant_obj.name()),
-                dart_cls_name
-            );
+            let variant_dart_cls_name =
+                &format!("{}{}", DartCodeOracle::class_name(variant_obj.name()), dart_cls_name);
 
             // Prepare constructor parameters
             let constructor_params = variant_obj
@@ -321,11 +307,8 @@ pub fn generate_enum(obj: &Enum, type_helper: &dyn TypeHelperRenderer) -> dart::
         }
 
         let is_error_enum = type_helper.get_ci().is_name_used_as_error(obj.name());
-        let implements_exception = if is_error_enum {
-            quote!( implements Exception)
-        } else {
-            quote!()
-        };
+        let implements_exception =
+            if is_error_enum { quote!( implements Exception) } else { quote!() };
 
         // For error enums, also generate an error handler
         let error_handler_class = if is_error_enum {

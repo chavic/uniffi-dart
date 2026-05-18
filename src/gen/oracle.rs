@@ -2,16 +2,12 @@ use genco::lang::dart;
 use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
 use uniffi_bindgen::interface::ffi::ExternalFfiMetadata;
-use uniffi_bindgen::interface::{Argument, Object, ObjectImpl};
-
-use crate::gen::CodeType;
-use uniffi_bindgen::interface::{AsType, Callable, FfiType, Type};
+use uniffi_bindgen::interface::{Argument, AsType, Callable, FfiType, Object, ObjectImpl, Type};
 use uniffi_bindgen::ComponentInterface;
-
-use crate::gen::primitives;
 
 // use super::render::{AsRenderable, Renderable};
 use super::{callback_interface, compounds, custom, enums, objects, records};
+use crate::gen::{primitives, CodeType};
 
 pub struct DartCodeOracle;
 
@@ -71,10 +67,7 @@ impl DartCodeOracle {
 
     /// Get the idiomatic Dart rendering of an FFI callback function name
     pub fn ffi_callback_name(nm: &str) -> String {
-        format!(
-            "Pointer<NativeFunction<{}>>",
-            Self::callback_name(&nm.to_upper_camel_case())
-        )
+        format!("Pointer<NativeFunction<{}>>", Self::callback_name(&nm.to_upper_camel_case()))
     }
 
     /// Helper method to generate the callback name based on `Type`.
@@ -122,9 +115,8 @@ impl DartCodeOracle {
 
     /// Helper method to fully qualify imports of external `RustBuffer`s
     fn rust_buffer_name_with_path(module_path: &str, ci: &ComponentInterface) -> dart::Tokens {
-        let namespace = ci
-            .namespace_for_module_path(module_path)
-            .expect("module path should exist");
+        let namespace =
+            ci.namespace_for_module_path(module_path).expect("module path should exist");
         if namespace != ci.namespace() {
             return quote!($(namespace).RustBuffer);
         }
@@ -304,11 +296,7 @@ impl DartCodeOracle {
                     let inner = DartCodeOracle::dart_type_label(Some(inner_type));
                     quote!(List<$inner>)
                 }
-                Type::Map {
-                    key_type,
-                    value_type,
-                    ..
-                } => {
+                Type::Map { key_type, value_type, .. } => {
                     let key = DartCodeOracle::dart_type_label(Some(key_type));
                     let value = DartCodeOracle::dart_type_label(Some(value_type));
                     quote!(Map<$key, $value>)
@@ -602,10 +590,7 @@ impl DartCodeOracle {
     pub fn lower_arg_with_callback_handling(arg: &Argument) -> dart::Tokens {
         let base_lower = Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name()))));
         match arg.as_type() {
-            Type::Object {
-                imp: ObjectImpl::CallbackTrait,
-                ..
-            } => base_lower,
+            Type::Object { imp: ObjectImpl::CallbackTrait, .. } => base_lower,
             Type::CallbackInterface { .. } => quote!($base_lower.address),
             _ => base_lower,
         }
@@ -725,33 +710,23 @@ impl<T: AsType> AsCodeType for T {
             Type::Duration => Box::new(primitives::DurationCodeType),
             Type::Bytes => Box::new(primitives::BytesCodeType),
             Type::Object { name, imp, .. } => Box::new(objects::ObjectCodeType::new(name, imp)),
-            Type::Optional { inner_type } => Box::new(compounds::OptionalCodeType::new(
-                self.as_type(),
-                *inner_type,
-            )),
-            Type::Sequence { inner_type } => Box::new(compounds::SequenceCodeType::new(
-                self.as_type(),
-                *inner_type,
-            )),
-            Type::Map {
-                key_type,
-                value_type,
-                ..
-            } => Box::new(compounds::MapCodeType::new(
-                self.as_type(),
-                *key_type,
-                *value_type,
-            )),
+            Type::Optional { inner_type } => {
+                Box::new(compounds::OptionalCodeType::new(self.as_type(), *inner_type))
+            }
+            Type::Sequence { inner_type } => {
+                Box::new(compounds::SequenceCodeType::new(self.as_type(), *inner_type))
+            }
+            Type::Map { key_type, value_type, .. } => {
+                Box::new(compounds::MapCodeType::new(self.as_type(), *key_type, *value_type))
+            }
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
             Type::Record { name, .. } => Box::new(records::RecordCodeType::new(name)),
-            Type::CallbackInterface { name, .. } => Box::new(
-                callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()),
-            ),
-            Type::Custom {
-                name,
-                module_path,
-                builtin,
-            } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
+            Type::CallbackInterface { name, .. } => {
+                Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()))
+            }
+            Type::Custom { name, module_path, builtin } => {
+                Box::new(custom::CustomCodeType::new(name, module_path, builtin))
+            }
             _ => todo!("As Type for Type::{:?}", self.as_type()),
         }
     }

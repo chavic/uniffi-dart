@@ -38,24 +38,15 @@ pub fn test_no_args_void_return() {
 pub fn run_benchmarks(language: String, cb: Box<dyn TestCallbackInterface>) {
     println!("Running benchmarks for {language}");
 
-    let test_data = TestData {
-        foo: "SomeStringData".to_string(),
-        bar: "SomeMoreStringData".to_string(),
-    };
+    let test_data =
+        TestData { foo: "SomeStringData".to_string(), bar: "SomeMoreStringData".to_string() };
 
     // Simple timing-based benchmarks (not using Criterion for now to avoid complexity)
 
     // Test function calls
     let start = Instant::now();
     for _ in 0..1000 {
-        test_function(
-            10,
-            100,
-            TestData {
-                foo: test_data.foo.clone(),
-                bar: test_data.bar.clone(),
-            },
-        );
+        test_function(10, 100, TestData { foo: test_data.foo.clone(), bar: test_data.bar.clone() });
     }
     let function_time = start.elapsed();
     println!("{language}-functions-basic: {:?}", function_time);
@@ -66,10 +57,7 @@ pub fn run_benchmarks(language: String, cb: Box<dyn TestCallbackInterface>) {
         test_void_return(
             10,
             100,
-            TestData {
-                foo: test_data.foo.clone(),
-                bar: test_data.bar.clone(),
-            },
+            TestData { foo: test_data.foo.clone(), bar: test_data.bar.clone() },
         );
     }
     let void_time = start.elapsed();
@@ -81,22 +69,12 @@ pub fn run_benchmarks(language: String, cb: Box<dyn TestCallbackInterface>) {
         test_no_args_void_return();
     }
     let no_args_time = start.elapsed();
-    println!(
-        "{language}-functions-no-args-void-return: {:?}",
-        no_args_time
-    );
+    println!("{language}-functions-no-args-void-return: {:?}", no_args_time);
 
     // Test callbacks
     let start = Instant::now();
     for _ in 0..1000 {
-        cb.method(
-            10,
-            100,
-            TestData {
-                foo: test_data.foo.clone(),
-                bar: test_data.bar.clone(),
-            },
-        );
+        cb.method(10, 100, TestData { foo: test_data.foo.clone(), bar: test_data.bar.clone() });
     }
     let callback_time = start.elapsed();
     println!("{language}-callbacks-basic: {:?}", callback_time);
@@ -107,10 +85,7 @@ pub fn run_benchmarks(language: String, cb: Box<dyn TestCallbackInterface>) {
         cb.method_with_void_return(
             10,
             100,
-            TestData {
-                foo: test_data.foo.clone(),
-                bar: test_data.bar.clone(),
-            },
+            TestData { foo: test_data.foo.clone(), bar: test_data.bar.clone() },
         );
     }
     let callback_void_time = start.elapsed();
@@ -122,10 +97,7 @@ pub fn run_benchmarks(language: String, cb: Box<dyn TestCallbackInterface>) {
         cb.method_with_no_args_and_void_return();
     }
     let callback_no_args_time = start.elapsed();
-    println!(
-        "{language}-callbacks-no-args-void-return: {:?}",
-        callback_no_args_time
-    );
+    println!("{language}-callbacks-no-args-void-return: {:?}", callback_no_args_time);
 
     println!("Benchmarks complete for {language}!");
 }

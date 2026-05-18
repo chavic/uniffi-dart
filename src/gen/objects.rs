@@ -1,20 +1,18 @@
-use genco::prelude::*;
 use std::fmt::Debug;
 
-use crate::gen::callback_interface::{
-    generate_callback_functions, generate_callback_interface,
-    generate_callback_interface_vtable_init_function, generate_callback_vtable_interface,
-};
-use crate::gen::CodeType;
+use genco::prelude::*;
 use heck::ToLowerCamelCase;
 use uniffi_bindgen::interface::{AsType, Method, Object, ObjectImpl, UniffiTrait};
 use uniffi_bindgen::pipeline::general::nodes::Literal;
 
-use crate::gen::oracle::{AsCodeType, DartCodeOracle};
-use crate::gen::render::AsRenderable;
-use crate::gen::render::{Renderable, TypeHelperRenderer};
-
 use super::stream::generate_stream;
+use crate::gen::callback_interface::{
+    generate_callback_functions, generate_callback_interface,
+    generate_callback_interface_vtable_init_function, generate_callback_vtable_interface,
+};
+use crate::gen::oracle::{AsCodeType, DartCodeOracle};
+use crate::gen::render::{AsRenderable, Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 
 #[derive(Debug)]
 pub struct ObjectCodeType {
@@ -109,11 +107,8 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
 
     // Stream workaround, make it more elegant later
 
-    let stream_glue = if obj.name().contains("StreamExt") {
-        generate_stream(obj, type_helper)
-    } else {
-        quote!()
-    };
+    let stream_glue =
+        if obj.name().contains("StreamExt") { generate_stream(obj, type_helper) } else { quote!() };
 
     let mut constructor_definitions: Vec<dart::Tokens> = Vec::new();
     let mut async_constructor_factories: Vec<dart::Tokens> = Vec::new();
@@ -235,10 +230,8 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     };
 
     // Generate toString() method for error interfaces
-    let has_display_trait = obj
-        .uniffi_traits()
-        .iter()
-        .any(|t| matches!(t, UniffiTrait::Display { .. }));
+    let has_display_trait =
+        obj.uniffi_traits().iter().any(|t| matches!(t, UniffiTrait::Display { .. }));
 
     let to_string_method: dart::Tokens =
         if is_error_interface && !obj.is_trait_interface() && !has_display_trait {
@@ -379,10 +372,7 @@ fn generate_callback_trait_rust_method(
         .collect::<Vec<_>>();
 
     let (ret, lifter) = if let Some(ret) = method.return_type() {
-        (
-            ret.as_renderable().render_type(ret, type_helper),
-            quote!($(ret.as_codetype().lift())),
-        )
+        (ret.as_renderable().render_type(ret, type_helper), quote!($(ret.as_codetype().lift())))
     } else {
         (quote!(void), quote!((_) {}))
     };
@@ -464,10 +454,7 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
     };
 
     let (ret, lifter) = if let Some(ret) = func.return_type() {
-        (
-            ret.as_renderable().render_type(ret, type_helper),
-            quote!($(ret.as_codetype().lift())),
-        )
+        (ret.as_renderable().render_type(ret, type_helper), quote!($(ret.as_codetype().lift())))
     } else {
         (quote!(void), quote!((_) {}))
     };
@@ -674,15 +661,11 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
     let ffi_object_free_name = obj.ffi_object_free().name();
     let ffi_object_clone_name = obj.ffi_object_clone().name();
 
-    let abstract_methods = obj
-        .methods()
-        .into_iter()
-        .map(|method| generate_interface_method(method, type_helper));
+    let abstract_methods =
+        obj.methods().into_iter().map(|method| generate_interface_method(method, type_helper));
 
-    let concrete_methods = obj
-        .methods()
-        .into_iter()
-        .map(|method| generate_method(method, type_helper));
+    let concrete_methods =
+        obj.methods().into_iter().map(|method| generate_method(method, type_helper));
 
     quote! {
         abstract class $cls_name {

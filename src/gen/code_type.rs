@@ -1,4 +1,5 @@
 use std::fmt::Debug;
+
 use uniffi_bindgen::pipeline::general::nodes::Literal;
 
 /// A trait tor the implementation.

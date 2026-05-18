@@ -4,9 +4,9 @@
 #![no_implicit_prelude]
 
 // Let's not have the macros care about derive being shadowed in the macro namespace for now..
-use ::std::prelude::rust_2021::derive;
 // Required for now because `static-assertions` (used internally) macros assume it to be in scope.
 use ::std::marker::Sized;
+use ::std::prelude::rust_2021::derive;
 
 mod callback_interface;
 
@@ -164,23 +164,18 @@ fn take_record_with_bytes(rwb: RecordWithBytes) -> ::std::vec::Vec<u8> {
 
 #[::uniffi::export]
 fn call_callback_interface(cb: ::std::boxed::Box<dyn TestCallbackInterface>) {
-    use ::std::{assert_eq, matches, option::Option::*, result::Result::*, string::ToString, vec};
+    use ::std::option::Option::*;
+    use ::std::result::Result::*;
+    use ::std::string::ToString;
+    use ::std::{assert_eq, matches, vec};
 
     cb.do_nothing();
     assert_eq!(cb.add(1, 1), 2);
     assert_eq!(cb.optional(Some(1)), 1);
     assert_eq!(cb.optional(None), 0);
-    assert_eq!(
-        cb.with_bytes(RecordWithBytes {
-            some_bytes: vec![9, 8, 7],
-        }),
-        vec![9, 8, 7]
-    );
+    assert_eq!(cb.with_bytes(RecordWithBytes { some_bytes: vec![9, 8, 7] }), vec![9, 8, 7]);
     assert_eq!(Ok(10), cb.try_parse_int("10".to_string()));
-    assert_eq!(
-        Err(BasicError::InvalidInput),
-        cb.try_parse_int("ten".to_string())
-    );
+    assert_eq!(Err(BasicError::InvalidInput), cb.try_parse_int("ten".to_string()));
     assert!(matches!(
         cb.try_parse_int("force-unexpected-error".to_string()),
         Err(BasicError::UnexpectedError { .. }),
@@ -198,16 +193,12 @@ pub struct Zero {
 #[::uniffi::export]
 fn make_zero() -> Zero {
     use ::std::borrow::ToOwned;
-    Zero {
-        inner: "ZERO".to_owned(),
-    }
+    Zero { inner: "ZERO".to_owned() }
 }
 
 #[::uniffi::export]
 fn make_record_with_bytes() -> RecordWithBytes {
-    RecordWithBytes {
-        some_bytes: ::std::vec![0, 1, 2, 3, 4],
-    }
+    RecordWithBytes { some_bytes: ::std::vec![0, 1, 2, 3, 4] }
 }
 
 #[derive(::uniffi::Enum)]

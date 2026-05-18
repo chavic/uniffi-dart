@@ -1,13 +1,15 @@
-use crate::gen;
-use anyhow::{bail, Result};
-use camino::{Utf8Path, Utf8PathBuf};
-use camino_tempfile::tempdir;
 use std::fs::{copy, create_dir_all, File};
 use std::io::Write;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
+
+use anyhow::{bail, Result};
+use camino::{Utf8Path, Utf8PathBuf};
+use camino_tempfile::tempdir;
 use uniffi_testing::UniFFITestHelper;
+
+use crate::gen;
 
 // A source to compile for a test
 #[derive(Debug)]
@@ -259,11 +261,7 @@ void main(List<String> args) async {{
     // Copy fixture test files to output directory
     let test_glob_pattern = "test/*.dart";
     for file in glob::glob(test_glob_pattern)?.filter_map(Result::ok) {
-        let filename = file
-            .file_name()
-            .expect("bad filename")
-            .to_str()
-            .expect("non-UTF8 filename");
+        let filename = file.file_name().expect("bad filename").to_str().expect("non-UTF8 filename");
         copy(&file, test_outdir.join(filename))?;
     }
 

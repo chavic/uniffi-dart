@@ -29,19 +29,15 @@ fn to_string_timestamp(a: SystemTime) -> String {
 }
 
 fn get_pre_epoch_timestamp() -> SystemTime {
-    std::time::SystemTime::UNIX_EPOCH
-        .checked_sub(std::time::Duration::new(1, 1_000_000))
-        .unwrap()
+    std::time::SystemTime::UNIX_EPOCH.checked_sub(std::time::Duration::new(1, 1_000_000)).unwrap()
 }
 
 fn add(a: SystemTime, b: Duration) -> Result<SystemTime> {
-    a.checked_add(b)
-        .ok_or(ChronologicalError::TimeOverflow { a, b })
+    a.checked_add(b).ok_or(ChronologicalError::TimeOverflow { a, b })
 }
 
 fn diff(a: SystemTime, b: SystemTime) -> Result<Duration> {
-    a.duration_since(b)
-        .map_err(|_| ChronologicalError::TimeDiffError { a, b })
+    a.duration_since(b).map_err(|_| ChronologicalError::TimeDiffError { a, b })
 }
 
 fn now() -> SystemTime {
@@ -64,8 +60,7 @@ fn set_seconds_before_unix_epoch(seconds: u64) -> Result<SystemTime> {
     let a = SystemTime::UNIX_EPOCH;
     let b = Duration::from_secs(seconds);
 
-    a.checked_sub(b)
-        .ok_or(ChronologicalError::TimeOverflow { a, b })
+    a.checked_sub(b).ok_or(ChronologicalError::TimeOverflow { a, b })
 }
 
 type Result<T, E = ChronologicalError> = std::result::Result<T, E>;

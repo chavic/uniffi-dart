@@ -1,8 +1,10 @@
-use super::{callback_interface, compounds, custom, enums, primitives, records};
-use super::{objects, oracle::AsCodeType};
-use genco::{lang::dart, quote};
+use genco::lang::dart;
+use genco::quote;
 use uniffi_bindgen::interface::{AsType, Enum, Object, Record, Type};
 use uniffi_bindgen::ComponentInterface;
+
+use super::oracle::AsCodeType;
+use super::{callback_interface, compounds, custom, enums, objects, primitives, records};
 
 pub trait Renderer<T> {
     fn render(&self) -> T;
@@ -43,10 +45,7 @@ pub trait Renderable {
             Type::Sequence { inner_type } => {
                 quote!(List<$(&self.render_type(inner_type, type_helper))>)
             }
-            Type::Map {
-                key_type,
-                value_type,
-            } => {
+            Type::Map { key_type, value_type } => {
                 quote!(Map<$(&self.render_type(key_type, type_helper)), $(&self.render_type(value_type, type_helper))>)
             }
             Type::Enum { name, .. } => quote!($(DartCodeOracle::class_name(name))),
@@ -89,32 +88,23 @@ impl<T: AsType> AsRenderable for T {
             Type::Duration => Box::new(primitives::DurationCodeType),
             Type::Bytes => Box::new(primitives::BytesCodeType),
             Type::Object { name, imp, .. } => Box::new(objects::ObjectCodeType::new(name, imp)),
-            Type::Optional { inner_type } => Box::new(compounds::OptionalCodeType::new(
-                self.as_type(),
-                *inner_type,
-            )),
-            Type::Sequence { inner_type } => Box::new(compounds::SequenceCodeType::new(
-                self.as_type(),
-                *inner_type,
-            )),
-            Type::Map {
-                key_type,
-                value_type,
-            } => Box::new(compounds::MapCodeType::new(
-                self.as_type(),
-                *key_type,
-                *value_type,
-            )),
+            Type::Optional { inner_type } => {
+                Box::new(compounds::OptionalCodeType::new(self.as_type(), *inner_type))
+            }
+            Type::Sequence { inner_type } => {
+                Box::new(compounds::SequenceCodeType::new(self.as_type(), *inner_type))
+            }
+            Type::Map { key_type, value_type } => {
+                Box::new(compounds::MapCodeType::new(self.as_type(), *key_type, *value_type))
+            }
             Type::Enum { name, .. } => Box::new(enums::EnumCodeType::new(name)),
             Type::Record { name, .. } => Box::new(records::RecordCodeType::new(name)),
-            Type::Custom {
-                name,
-                module_path,
-                builtin,
-            } => Box::new(custom::CustomCodeType::new(name, module_path, builtin)),
-            Type::CallbackInterface { name, .. } => Box::new(
-                callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()),
-            ),
+            Type::Custom { name, module_path, builtin } => {
+                Box::new(custom::CustomCodeType::new(name, module_path, builtin))
+            }
+            Type::CallbackInterface { name, .. } => {
+                Box::new(callback_interface::CallbackInterfaceCodeType::new(name, self.as_type()))
+            }
             _ => todo!("Renderable for Type::{:?}", self.as_type()),
         }
     }

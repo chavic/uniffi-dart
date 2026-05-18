@@ -41,9 +41,7 @@ impl PayloadError {
 
 impl ProtocolError {
     pub fn new(message: String) -> Self {
-        Self {
-            payload_error: Arc::new(PayloadError::new(message)),
-        }
+        Self { payload_error: Arc::new(PayloadError::new(message)) }
     }
 
     pub fn payload_error(self: Arc<Self>) -> Option<Arc<PayloadError>> {

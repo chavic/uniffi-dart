@@ -1,7 +1,8 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use stringcase::pascal_case;
-use syn::{parse::Parse, parse_macro_input, Ident, ItemFn, LitStr, Type};
+use syn::parse::Parse;
+use syn::{parse_macro_input, Ident, ItemFn, LitStr, Type};
 
 struct StreamAttr {
     item_type: Type,
@@ -28,10 +29,7 @@ impl Parse for StreamAttr {
 
             input.parse::<syn::Token![=]>()?;
             if runtime.is_some() {
-                return Err(syn::Error::new(
-                    ident.span(),
-                    "duplicate `runtime` argument",
-                ));
+                return Err(syn::Error::new(ident.span(), "duplicate `runtime` argument"));
             }
 
             let value: LitStr = input.parse()?;

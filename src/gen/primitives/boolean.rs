@@ -1,11 +1,8 @@
-use crate::gen::{
-    quote,
-    render::{Renderable, TypeHelperRenderer},
-};
-
 use genco::lang::dart;
 
 use super::paste;
+use crate::gen::quote;
+use crate::gen::render::{Renderable, TypeHelperRenderer};
 
 impl_code_type_for_primitive!(BooleanCodeType, "bool", "Bool");
 

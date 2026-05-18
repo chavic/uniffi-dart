@@ -64,9 +64,8 @@ Run formatting through the flake:
 nix fmt -- --ci
 ```
 
-The flake formatter is currently scoped to Nix files only. Rust, Dart, and
-fixture formatting are left to the existing project commands to avoid unrelated
-format-only churn.
+The flake formatter covers Nix, Rust, and Dart files. Rust formatting uses the
+repository `rustfmt.toml`; Dart formatting runs with the latest language version.
 
 Run the flake checks:
 

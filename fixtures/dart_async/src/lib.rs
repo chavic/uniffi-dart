@@ -1,11 +1,9 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::{Arc, Mutex, MutexGuard},
-    task::{Context, Poll, Waker},
-    thread,
-    time::Duration,
-};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex, MutexGuard};
+use std::task::{Context, Poll, Waker};
+use std::thread;
+use std::time::Duration;
 
 use futures::future::{AbortHandle, Abortable, Aborted};
 use once_cell::sync::Lazy;
@@ -36,10 +34,7 @@ impl Future for TimerFuture {
 
 impl TimerFuture {
     pub fn new(duration: Duration) -> Self {
-        let shared_state = Arc::new(Mutex::new(SharedState {
-            completed: false,
-            waker: None,
-        }));
+        let shared_state = Arc::new(Mutex::new(SharedState { completed: false, waker: None }));
 
         let thread_shared_state = shared_state.clone();
         // Let's mimic an event coming from somewhere else, like the system.
@@ -77,10 +72,7 @@ impl Future for BrokenTimerFuture {
 
 impl BrokenTimerFuture {
     pub fn new(duration: Duration, fail_after: Duration) -> Self {
-        let shared_state = Arc::new(Mutex::new(SharedState {
-            completed: false,
-            waker: None,
-        }));
+        let shared_state = Arc::new(Mutex::new(SharedState { completed: false, waker: None }));
 
         let thread_shared_state = shared_state.clone();
         // Let's mimic an event coming from somewhere else, like the system.
@@ -196,16 +188,8 @@ pub async fn new_my_record(a: String, b: u32) -> MyRecord {
 #[uniffi::export]
 pub fn list_async_items() -> Vec<AsyncItem> {
     vec![
-        AsyncItem {
-            id: 1,
-            state: AsyncItemState::Ready { timestamp_ms: 1111 },
-        },
-        AsyncItem {
-            id: 2,
-            state: AsyncItemState::Pending {
-                reason: "syncing".to_string(),
-            },
-        },
+        AsyncItem { id: 1, state: AsyncItemState::Ready { timestamp_ms: 1111 } },
+        AsyncItem { id: 2, state: AsyncItemState::Pending { reason: "syncing".to_string() } },
     ]
 }
 
@@ -336,19 +320,14 @@ pub enum AsyncError {
 
 #[uniffi::export(async_runtime = "tokio")]
 pub async fn use_shared_resource(options: SharedResourceOptions) -> Result<(), AsyncError> {
-    use tokio::{
-        sync::Mutex,
-        time::{sleep, timeout},
-    };
+    use tokio::sync::Mutex;
+    use tokio::time::{sleep, timeout};
 
     static MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
-    let _guard = timeout(
-        Duration::from_millis(options.timeout_ms.into()),
-        MUTEX.lock(),
-    )
-    .await
-    .map_err(|_| AsyncError::Timeout)?;
+    let _guard = timeout(Duration::from_millis(options.timeout_ms.into()), MUTEX.lock())
+        .await
+        .map_err(|_| AsyncError::Timeout)?;
 
     sleep(Duration::from_millis(options.release_after_ms.into())).await;
     Ok(())

@@ -170,17 +170,11 @@ impl InMemoryEventPersister {
 
 impl JsonEventPersister for InMemoryEventPersister {
     fn save(&self, event: String) {
-        self.events
-            .lock()
-            .expect("event persister lock poisoned")
-            .push(event);
+        self.events.lock().expect("event persister lock poisoned").push(event);
     }
 
     fn load(&self) -> Vec<String> {
-        self.events
-            .lock()
-            .expect("event persister lock poisoned")
-            .clone()
+        self.events.lock().expect("event persister lock poisoned").clone()
     }
 
     fn close(&self) {}

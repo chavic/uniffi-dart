@@ -4,10 +4,11 @@ mod boolean;
 mod duration;
 mod string;
 
-use crate::gen::render::{Renderable, TypeHelperRenderer};
-use crate::gen::CodeType;
+pub use boolean::BooleanCodeType;
+pub use duration::DurationCodeType;
 use genco::prelude::*;
 use paste::paste;
+pub use string::StringCodeType;
 use uniffi_bindgen::interface::{
     DefaultValue as InterfaceDefaultValue, Literal as InterfaceLiteral, Radix as InterfaceRadix,
     Type as InterfaceType,
@@ -16,9 +17,8 @@ use uniffi_bindgen::pipeline::general::nodes::{
     Literal as PipelineLiteral, Radix as PipelineRadix, Type as PipelineType, TypeNode,
 };
 
-pub use boolean::BooleanCodeType;
-pub use duration::DurationCodeType;
-pub use string::StringCodeType;
+use crate::gen::render::{Renderable, TypeHelperRenderer};
+use crate::gen::CodeType;
 
 pub(crate) fn escape_dart_string(value: &str) -> String {
     value
@@ -153,15 +153,7 @@ impl_code_type_for_primitive!(Float64CodeType, "double", "Double64");
 impl_renderable_for_primitive!(BytesCodeType, "Uint8List", "Uint8List");
 impl_renderable_for_primitive!(Int8CodeType, "int", "Int8", 1, -128, 127, "i8");
 impl_renderable_for_primitive!(Int16CodeType, "int", "Int16", 2, -32768, 32767, "i16");
-impl_renderable_for_primitive!(
-    Int32CodeType,
-    "int",
-    "Int32",
-    4,
-    -2147483648,
-    2147483647,
-    "i32"
-);
+impl_renderable_for_primitive!(Int32CodeType, "int", "Int32", 4, -2147483648, 2147483647, "i32");
 impl_renderable_for_primitive!(
     Int64CodeType,
     "int",
