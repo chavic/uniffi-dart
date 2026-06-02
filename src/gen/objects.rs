@@ -5,6 +5,7 @@ use heck::ToLowerCamelCase;
 use uniffi_bindgen::interface::{AsType, Method, Object, ObjectImpl, UniffiTrait};
 use uniffi_bindgen::pipeline::general::nodes::Literal;
 
+use super::defaults::render_argument_param;
 use super::stream::generate_stream;
 use crate::gen::callback_interface::{
     generate_callback_functions, generate_callback_interface,
@@ -138,7 +139,10 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             quote!()
         } else {
             quote!({$(for arg in constructor.arguments() =>
-                required $(DartCodeOracle::dart_type_label(Some(&arg.as_type()))) $(DartCodeOracle::var_name(arg.name())),
+                $(render_argument_param(
+                    arg,
+                    quote!($(DartCodeOracle::dart_type_label(Some(&arg.as_type()))))
+                )),
             )})
         };
 
@@ -450,7 +454,12 @@ pub fn generate_method(func: &Method, type_helper: &dyn TypeHelperRenderer) -> d
     let args = if func.arguments().is_empty() {
         quote!()
     } else {
-        quote!({$(for arg in &func.arguments() => required $(&arg.as_renderable().render_type(&arg.as_type(), type_helper)) $(DartCodeOracle::var_name(arg.name())),)})
+        quote!({$(for arg in &func.arguments() =>
+            $(render_argument_param(
+                arg,
+                arg.as_renderable().render_type(&arg.as_type(), type_helper)
+            )),
+        )})
     };
 
     let (ret, lifter) = if let Some(ret) = func.return_type() {
@@ -775,7 +784,10 @@ fn generate_interface_method(
         quote!()
     } else {
         quote!({$(for arg in method.arguments() =>
-            required $(&arg.as_renderable().render_type(&arg.as_type(), type_helper)) $(DartCodeOracle::var_name(arg.name())),
+            $(render_argument_param(
+                arg,
+                arg.as_renderable().render_type(&arg.as_type(), type_helper)
+            )),
         )})
     };
     let ret_type = method_return_type_tokens(method, type_helper);

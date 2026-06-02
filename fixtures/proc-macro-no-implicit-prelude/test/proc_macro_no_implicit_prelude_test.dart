@@ -180,13 +180,19 @@ void main() {
     });
 
     test('explicit values for defaultable APIs', () {
+      expect(doubleWithDefault(), equals(42));
       expect(doubleWithDefault(num: 21), equals(42));
       expect(doubleWithDefault(num: 10), equals(20));
 
       final objWithDefaults = ObjectWithDefaults(num: 30);
+      expect(objWithDefaults.addToNum(), equals(42));
       expect(objWithDefaults.addToNum(other: 12), equals(42));
       expect(objWithDefaults.addToNum(other: 5), equals(35));
       objWithDefaults.dispose();
+
+      final defaultObjWithDefaults = ObjectWithDefaults();
+      expect(defaultObjWithDefaults.addToNum(other: 12), equals(42));
+      defaultObjWithDefaults.dispose();
     });
 
     test('string operations without prelude', () {

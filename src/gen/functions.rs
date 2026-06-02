@@ -2,6 +2,7 @@ use genco::prelude::*;
 use heck::ToLowerCamelCase;
 use uniffi_bindgen::interface::{AsType, Function};
 
+use super::defaults::render_argument_param;
 use super::oracle::AsCodeType;
 use super::render::TypeHelperRenderer;
 use crate::gen::oracle::DartCodeOracle;
@@ -11,7 +12,12 @@ pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) 
     let args = if func.arguments().is_empty() {
         quote!()
     } else {
-        quote!({$(for arg in &func.arguments() => required $(&arg.as_renderable().render_type(&arg.as_type(), type_helper)) $(DartCodeOracle::var_name(arg.name())),)})
+        quote!({$(for arg in &func.arguments() =>
+            $(render_argument_param(
+                arg,
+                arg.as_renderable().render_type(&arg.as_type(), type_helper)
+            )),
+        )})
     };
 
     let (ret, lifter) = if let Some(ret) = func.return_type() {

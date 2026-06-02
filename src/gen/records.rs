@@ -2,8 +2,8 @@ use genco::prelude::*;
 use uniffi_bindgen::interface::{AsType, Record, Type};
 use uniffi_bindgen::pipeline::general::nodes::Literal as PipelineLiteral;
 
+use super::defaults::render_default_value;
 use super::oracle::{AsCodeType, DartCodeOracle};
-use super::primitives::render_interface_default_value;
 use super::render::{Renderable, TypeHelperRenderer};
 use super::types::generate_type;
 use crate::gen::CodeType;
@@ -36,14 +36,6 @@ impl CodeType for RecordCodeType {
     }
 }
 
-fn enum_name_from_type(ty: &Type) -> Option<String> {
-    match ty {
-        Type::Enum { name, .. } => Some(DartCodeOracle::class_name(name)),
-        Type::Optional { inner_type } => enum_name_from_type(inner_type),
-        _ => None,
-    }
-}
-
 impl Renderable for RecordCodeType {
     fn render_type_helper(&self, type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
         if type_helper.check(&self.id) {
@@ -65,15 +57,7 @@ pub fn generate_record(obj: &Record, type_helper: &dyn TypeHelperRenderer) -> da
         .map(|field| {
             let name = DartCodeOracle::var_name(field.name());
             if let Some(default_value) = field.default_value() {
-                if let Some(default_expr) = render_interface_default_value(
-                    default_value,
-                    &field.as_type(),
-                    |ty, variant| {
-                        let enum_name = enum_name_from_type(ty)?;
-                        let variant_name = DartCodeOracle::enum_variant_name(variant);
-                        Some(format!("{enum_name}.{variant_name}"))
-                    },
-                ) {
+                if let Some(default_expr) = render_default_value(default_value, &field.as_type()) {
                     quote!(this.$name = $(default_expr))
                 } else {
                     // Fallback to required when a default is present but cannot be rendered safely.
