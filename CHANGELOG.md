@@ -2,6 +2,33 @@
 
 All notable changes to uniffi-dart will be documented in this file.
 
+## v0.2.1+v0.31.2
+
+### Changes
+
+- Upgrade uniffi-rs from v0.31.1 to v0.31.2 (#146)
+
+### Fixes
+
+- Fix name mangling for all-caps acronym identifiers (#145)
+- Register recursive type helpers so recursive types generate correctly (#138)
+- Generate Rust-backed proxies for callback trait interfaces and handle
+  tagged callback interface pointers (#135)
+- Make the ordering of generated Dart type helpers deterministic (#134)
+
+## v0.2.0+v0.31.1
+
+### Breaking changes
+
+- **BREAKING**: Upgrade uniffi-rs from v0.30.0 to v0.31.1 (#125)
+
+### Fixes
+
+- Generate FfiConverter for Sequence/Optional of records in callback interfaces (#117)
+- Fix Dart error object renaming (#120)
+- Use Optional FfiConverter's `lower()` for inner types to avoid double-wrapping nullable records in callback return values (#121)
+- Make nullable record fields optional in Dart constructors (#122)
+
 ## v0.1.0+v0.30.0
 
 Initial release of uniffi-dart targeting uniffi-rs v0.30.0.
