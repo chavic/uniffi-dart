@@ -20,6 +20,7 @@ mod callback_interface;
 mod code_type;
 mod compounds;
 mod custom;
+mod defaults;
 mod enums;
 mod functions;
 mod objects;
