@@ -398,15 +398,15 @@ pub fn generate_callback_functions(
                     final obj = FfiConverterCallbackInterface$cls_name._handleMap.get(uniffiHandle);
                     $(arg_lifts)
                     final callback = uniffiFutureCallback.asFunction<$(&completion_dart)>();
-                    final state = _UniffiForeignFutureState();
-                    final handle = _uniffiForeignFutureHandleMap.insert(state);
+                    final state = UniffiForeignFutureState();
+                    final handle = uniffiForeignFutureHandleMap.insert(state);
                     outReturn.ref.handle = handle;
-                    outReturn.ref.free = _uniffiForeignFutureFreePointer;
+                    outReturn.ref.free = uniffiForeignFutureFreePointer;
 
                     () async {
                         try {
                             final result = await obj.$method_name($(for arg in &arg_names => $arg,));
-                            final removedState = _uniffiForeignFutureHandleMap.maybeRemove(handle);
+                            final removedState = uniffiForeignFutureHandleMap.maybeRemove(handle);
                             final effectiveState = removedState ?? state;
                             if (effectiveState.cancelled) {
                                 return;
@@ -421,7 +421,7 @@ pub fn generate_callback_functions(
                                 calloc.free(resultStructPtr);
                             }
                         } catch (e) {
-                            final removedState = _uniffiForeignFutureHandleMap.maybeRemove(handle);
+                            final removedState = uniffiForeignFutureHandleMap.maybeRemove(handle);
                             final effectiveState = removedState ?? state;
                             if (effectiveState.cancelled) {
                                 return;

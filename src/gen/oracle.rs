@@ -114,12 +114,9 @@ impl DartCodeOracle {
     }
 
     /// Helper method to fully qualify imports of external `RustBuffer`s
-    fn rust_buffer_name_with_path(module_path: &str, ci: &ComponentInterface) -> dart::Tokens {
-        let namespace =
-            ci.namespace_for_module_path(module_path).expect("module path should exist");
-        if namespace != ci.namespace() {
-            return quote!($(namespace).RustBuffer);
-        }
+    fn rust_buffer_name_with_path(_module_path: &str, _ci: &ComponentInterface) -> dart::Tokens {
+        // `RustBuffer` is declared once, in the shared runtime module that every
+        // generated file imports, so it never needs qualifying by namespace.
         quote!(RustBuffer)
     }
 
