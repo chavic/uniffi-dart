@@ -8,15 +8,25 @@ Future<Duration> measureTime(Future<void> Function() action) async {
   return end.difference(start);
 }
 
-// Timing assertions below check a LOWER bound only: that an async operation
-// waited at least its expected delay (proving the async plumbing actually
-// suspends). They deliberately do not assert an upper bound — wall-clock upper
-// bounds measure host/CI scheduling speed, not binding correctness, and are the
-// source of the flaky failures tracked in #139. This mirrors uniffi-rs's own
-// futures fixture (`test_futures.py`), which uses `assertGreater` with no upper
-// bound. Verified locally: the whole suite runs in ~9s with correct results; on
-// a loaded CI runner it can take ~200s, which is what tripped the old `< 300ms`
-// style bounds.
+// The DELAY-based timing assertions below check a LOWER bound only: that an
+// async operation waited at least its expected delay (proving the async
+// plumbing actually suspends). They deliberately do not assert an upper bound —
+// wall-clock upper bounds measure host/CI scheduling speed, not binding
+// correctness, and are the source of the flaky failures tracked in #139. This
+// mirrors uniffi-rs's own futures fixture (`test_futures.py`), which uses
+// `assertGreater` with no upper bound. (Illustrative, not enforced: locally the
+// whole suite runs in a few seconds with correct results; on a heavily loaded
+// CI runner it can take vastly longer, which is what tripped the old two-sided
+// per-operation bounds like `< 300ms`.)
+//
+// Two groups are intentionally different:
+//   - `concurrent_future` keeps a concurrency check, but as a *relative*
+//     comparison (concurrent run < sequential run) rather than a fragile
+//     absolute ceiling — load dilates both sides, so the inequality holds.
+//   - The immediate-operation checks (`always_ready`, `void`, sync methods,
+//     constructors) still assert an upper bound only. They have no lower bound
+//     to fall back on and share the same latent wall-clock fragility; tightening
+//     those is deliberately left for a separate change.
 
 class ErroringAsyncParser extends AsyncParser {
   @override
@@ -97,7 +107,12 @@ void main() {
   });
 
   test('concurrent_future', () async {
-    final time = await measureTime(() async {
+    // Run the same two delays concurrently and sequentially, then compare.
+    // A relative check (concurrent < sequential) verifies the futures actually
+    // overlap without a fragile absolute wall-clock ceiling: CI load dilates
+    // both measurements, so the inequality survives while an absolute `<= 300`
+    // would not. (Concurrent ≈ max(100, 200) = 200ms; sequential ≈ 300ms.)
+    final concurrentTime = await measureTime(() async {
       final results = await Future.wait([
         sayAfter(ms: 100, who: 'Alice'),
         sayAfter(ms: 200, who: 'Bob'),
@@ -107,7 +122,17 @@ void main() {
       expect(results[1], 'Hello, Bob!');
     });
 
-    expect(time.inMilliseconds >= 200, true);
+    final sequentialTime = await measureTime(() async {
+      await sayAfter(ms: 100, who: 'Alice');
+      await sayAfter(ms: 200, who: 'Bob');
+    });
+
+    // Lower bound: the longer of the two delays actually elapsed.
+    expect(concurrentTime.inMilliseconds >= 200, true);
+    // Concurrency: overlapping must be faster than summing the delays. If the
+    // binding regressed to serializing `Future.wait`, concurrentTime would rise
+    // to ~sequentialTime and this would fail.
+    expect(concurrentTime < sequentialTime, true);
   });
 
   test('with_tokio_runtime', () async {
