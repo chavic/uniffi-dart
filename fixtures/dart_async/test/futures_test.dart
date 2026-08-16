@@ -20,9 +20,9 @@ Future<Duration> measureTime(Future<void> Function() action) async {
 // per-operation bounds like `< 300ms`.)
 //
 // Two groups are intentionally different:
-//   - `concurrent_future` keeps a concurrency check, but as a *relative*
-//     comparison (concurrent run < sequential run) rather than a fragile
-//     absolute ceiling — load dilates both sides, so the inequality holds.
+//   - `concurrent_future` verifies concurrency structurally (completion order),
+//     not by comparing durations — see the note in that test for why a timing
+//     comparison can't reliably catch a serialization regression.
 //   - The immediate-operation checks (`always_ready`, `void`, sync methods,
 //     constructors) still assert an upper bound only. They have no lower bound
 //     to fall back on and share the same latent wall-clock fragility; tightening
@@ -107,11 +107,17 @@ void main() {
   });
 
   test('concurrent_future', () async {
-    // Run the same two delays concurrently and sequentially, then compare.
-    // A relative check (concurrent < sequential) verifies the futures actually
-    // overlap without a fragile absolute wall-clock ceiling: CI load dilates
-    // both measurements, so the inequality survives while an absolute `<= 300`
-    // would not. (Concurrent ≈ max(100, 200) = 200ms; sequential ≈ 300ms.)
+    // Comparing concurrent vs. sequential wall-clock time cannot reliably detect
+    // a serialization regression: a serialized `Future.wait` is structurally the
+    // same work as running the calls sequentially (100+200 either way), so the
+    // comparison becomes a coin flip, while any fixed margin or ratio re-adds the
+    // load-sensitive flakiness #139 is about (the Rust-side `thread::sleep`
+    // delays don't dilate under load, but scheduling jitter adds unbounded time).
+    // Instead assert two load-robust properties.
+
+    // (1) Correct positional results + a lower bound. The lower bound is
+    // jitter-immune — sleeps only ever lengthen a run — and catches a future
+    // resolving before its delay elapsed.
     final concurrentTime = await measureTime(() async {
       final results = await Future.wait([
         sayAfter(ms: 100, who: 'Alice'),
@@ -121,18 +127,25 @@ void main() {
       expect(results[0], 'Hello, Alice!');
       expect(results[1], 'Hello, Bob!');
     });
+    expect(concurrentTime.inMilliseconds, greaterThanOrEqualTo(200));
 
-    final sequentialTime = await measureTime(() async {
-      await sayAfter(ms: 100, who: 'Alice');
-      await sayAfter(ms: 200, who: 'Bob');
-    });
-
-    // Lower bound: the longer of the two delays actually elapsed.
-    expect(concurrentTime.inMilliseconds >= 200, true);
-    // Concurrency: overlapping must be faster than summing the delays. If the
-    // binding regressed to serializing `Future.wait`, concurrentTime would rise
-    // to ~sequentialTime and this would fail.
-    expect(concurrentTime < sequentialTime, true);
+    // (2) Completion ORDER, not duration: start a slow future, then a fast one,
+    // and require the fast one to finish while the slow one is still pending. If
+    // the bindings serialized FFI futures, the slow call would have to complete
+    // before the fast one could even start, failing this deterministically —
+    // with ~2000ms of structural headroom (not a tuned threshold), so it can't
+    // reflake on a loaded runner.
+    var slowDone = false;
+    final slow =
+        sayAfter(ms: 2000, who: 'Slow').whenComplete(() => slowDone = true);
+    await sayAfter(ms: 1, who: 'Fast');
+    expect(
+      slowDone,
+      isFalse,
+      reason: 'a 1ms future completed only after a 2000ms future that started '
+          'earlier — FFI futures appear to be serialized',
+    );
+    await slow; // let the fixture call finish before the test ends
   });
 
   test('with_tokio_runtime', () async {
