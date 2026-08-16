@@ -359,7 +359,7 @@ pub fn generate_callback_functions(
 
         // Generate the function body
         let callback_method_name =
-            &format!("{}{}", &DartCodeOracle::fn_name(callback_name), &DartCodeOracle::class_name(m.name()));
+            &format!("{}{}", DartCodeOracle::fn_name(callback_name), DartCodeOracle::class_name(m.name()));
 
         if m.is_async() {
             let completion_base = foreign_future_completion_name(m);
