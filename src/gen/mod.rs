@@ -118,14 +118,14 @@ fn uniffi_function_definitions(
         // For @Native, we need both native types (for the annotation) and Dart types (for the external declaration)
         let native_return_type = match fun.return_type() {
             Some(return_type) => {
-                quote! { $(DartCodeOracle::ffi_native_type_label(Some(return_type), ci)) }
+                quote! { $(DartCodeOracle::ffi_native_type_label(Some(return_type))) }
             }
             None => quote! { Void },
         };
 
         let dart_return_type = match fun.return_type() {
             Some(return_type) => {
-                quote! { $(DartCodeOracle::ffi_dart_type_label(Some(return_type), ci)) }
+                quote! { $(DartCodeOracle::ffi_dart_type_label(Some(return_type))) }
             }
             None => quote! { void },
         };
@@ -136,8 +136,8 @@ fn uniffi_function_definitions(
 
             for arg in fun.arguments() {
                 let arg_name = arg.name();
-                let native_type = DartCodeOracle::ffi_native_type_label(Some(&arg.type_()), ci);
-                let dart_type = DartCodeOracle::ffi_dart_type_label(Some(&arg.type_()), ci);
+                let native_type = DartCodeOracle::ffi_native_type_label(Some(&arg.type_()));
+                let dart_type = DartCodeOracle::ffi_dart_type_label(Some(&arg.type_()));
 
                 native_arg_vec.push(native_type);
                 dart_arg_with_names_vec.push(quote!($dart_type $arg_name));
