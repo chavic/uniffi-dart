@@ -85,8 +85,8 @@ impl Config {
 /// The `RustBuffer` alloc/free/reserve helpers, which `RustBuffer`'s own methods
 /// call. They live alongside `RustBuffer` in the shared runtime rather than being
 /// repeated in every component file.
-fn is_rustbuffer_fn(name: &str) -> bool {
-    name.contains("_rustbuffer_")
+fn is_rustbuffer_fn(ci: &ComponentInterface, name: &str) -> bool {
+    ci.iter_rust_buffer_ffi_function_definitions().any(|f| f.name() == name)
 }
 
 /// Emit the `@Native` extern declarations for `ci`'s FFI functions.
@@ -202,7 +202,7 @@ impl<'a> DartWrapper<'a> {
             $(functions_definitions)
 
             // FFI function definitions using @Native
-            $(uniffi_function_definitions(self.ci, "_uniffiAssetId", |name| !is_rustbuffer_fn(name)))
+            $(uniffi_function_definitions(self.ci, "_uniffiAssetId", |name| !is_rustbuffer_fn(self.ci, name)))
 
             // API version and checksum validation
             void _checkApiVersion() {
@@ -272,7 +272,7 @@ impl BindingGenerator for DartBindingGenerator {
 
                 const _uniffiAssetId = $(quoted(asset_id));
 
-                $(uniffi_function_definitions(ci, "_uniffiAssetId", is_rustbuffer_fn))
+                $(uniffi_function_definitions(ci, "_uniffiAssetId", |name| is_rustbuffer_fn(ci, name)))
             };
             write_dart(settings.out_dir.join(format!("{}.dart", types::RUNTIME_MODULE)), runtime)?;
         }
