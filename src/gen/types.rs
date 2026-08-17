@@ -202,24 +202,6 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn include_names_iterate_in_name_order() {
-        let ci = ComponentInterface::new("determinism");
-        let renderer = TypeHelpersRenderer::new(&ci);
-
-        renderer.include_once_check("z", &Type::String);
-        renderer.include_once_check("a", &Type::UInt8);
-        renderer.include_once_check("m", &Type::Boolean);
-
-        let names: Vec<_> = renderer.get_include_names().keys().cloned().collect();
-        assert_eq!(names, ["a", "m", "z"]);
-    }
-}
-
 pub fn generate_type(ty: &Type) -> dart::Tokens {
     match ty {
         Type::UInt8
@@ -651,5 +633,23 @@ pub fn runtime_scaffolding(ci: &ComponentInterface) -> dart::Tokens {
 
 
         $(string_converter)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn include_names_iterate_in_name_order() {
+        let ci = ComponentInterface::new("determinism");
+        let renderer = TypeHelpersRenderer::new(&ci);
+
+        renderer.include_once_check("z", &Type::String);
+        renderer.include_once_check("a", &Type::UInt8);
+        renderer.include_once_check("m", &Type::Boolean);
+
+        let names: Vec<_> = renderer.get_include_names().keys().cloned().collect();
+        assert_eq!(names, ["a", "m", "z"]);
     }
 }
