@@ -188,6 +188,11 @@ impl<'a> DartWrapper<'a> {
         let asset_id_suffix = &self.config.asset_id(); // e.g., "uniffi:hello_world"
 
         quote! {
+            // The runtime scaffolding moved to the shared module, so a component
+            // file may not use every import it declares. Which ones go unused
+            // depends on the interface, so the directive is simpler than tracking
+            // usage per import.
+            $("// ignore_for_file: unused_import")$['\n']
             library $package_name;
 
             $(type_helper_code) // Imports, Types and Type Helper
@@ -266,6 +271,7 @@ impl BindingGenerator for DartBindingGenerator {
         if let Some(Component { ci, config, .. }) = components.first() {
             let asset_id = format!("package:{}/{}", config.package_name(), config.asset_id());
             let runtime = quote! {
+                $("// ignore_for_file: unused_import")$['\n']
                 $(format!("library {};", types::RUNTIME_MODULE))
 
                 $(types::runtime_scaffolding(ci))
