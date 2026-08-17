@@ -264,12 +264,45 @@ impl BindingGenerator for DartBindingGenerator {
             Ok(())
         };
 
+        // A component whose namespace matches the runtime module would write its
+        // own file over the shared runtime.
+        if let Some(Component { ci, .. }) =
+            components.iter().find(|c| c.ci.namespace() == types::RUNTIME_MODULE)
+        {
+            bail!(
+                "namespace `{}` collides with the shared runtime module `{}.dart`; \
+                 rename the namespace",
+                ci.namespace(),
+                types::RUNTIME_MODULE
+            );
+        }
+
         // The shared runtime goes out once for the whole generation, ahead of the
-        // per-component files that import it. Any component supplies the
-        // `rustbuffer_*` symbols and asset id -- they all resolve into the same
-        // cdylib, so the choice is arbitrary.
+        // per-component files that import it. The first component supplies the
+        // `rustbuffer_*` symbols and asset id for all of them: only library mode
+        // generates more than one component, every component there links into one
+        // cdylib, and UniFFI gives each the same cdylib name. If a configuration
+        // ever breaks that assumption, the runtime would resolve its allocator
+        // against the wrong library, so check rather than trust it.
+        let full_asset_id = |config: &Config| {
+            format!("package:{}/{}", config.package_name(), config.asset_id())
+        };
+        if let Some(Component { config: first, .. }) = components.first() {
+            for Component { ci, config, .. } in components {
+                if full_asset_id(config) != full_asset_id(first) {
+                    bail!(
+                        "component `{}` has asset id `{}`, which differs from `{}`; \
+                         the shared runtime module can only carry one asset id",
+                        ci.namespace(),
+                        full_asset_id(config),
+                        full_asset_id(first)
+                    );
+                }
+            }
+        }
+
         if let Some(Component { ci, config, .. }) = components.first() {
-            let asset_id = format!("package:{}/{}", config.package_name(), config.asset_id());
+            let asset_id = full_asset_id(config);
             let runtime = quote! {
                 $("// ignore_for_file: unused_import")$['\n']
                 $(format!("library {};", types::RUNTIME_MODULE))
