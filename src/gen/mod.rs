@@ -284,9 +284,8 @@ impl BindingGenerator for DartBindingGenerator {
         // cdylib, and UniFFI gives each the same cdylib name. If a configuration
         // ever breaks that assumption, the runtime would resolve its allocator
         // against the wrong library, so check rather than trust it.
-        let full_asset_id = |config: &Config| {
-            format!("package:{}/{}", config.package_name(), config.asset_id())
-        };
+        let full_asset_id =
+            |config: &Config| format!("package:{}/{}", config.package_name(), config.asset_id());
         if let Some(Component { config: first, .. }) = components.first() {
             for Component { ci, config, .. } in components {
                 if full_asset_id(config) != full_asset_id(first) {

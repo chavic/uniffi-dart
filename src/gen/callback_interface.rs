@@ -109,8 +109,7 @@ pub fn generate_callback_interface(
             let struct_name = struct_def.name().to_string();
 
             if !type_helper.include_once_by_name(&struct_name) {
-                async_struct_defs
-                    .push(generate_foreign_future_struct_definition(&struct_def));
+                async_struct_defs.push(generate_foreign_future_struct_definition(&struct_def));
             }
 
             let completion_name = foreign_future_completion_name(method);
@@ -240,17 +239,13 @@ fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method]
         let arg_native_types: Vec<dart::Tokens> = method
             .arguments()
             .iter()
-            .map(|arg| {
-                DartCodeOracle::native_type_label(Some(&arg.as_type()))
-            })
+            .map(|arg| DartCodeOracle::native_type_label(Some(&arg.as_type())))
             .collect();
 
         let arg_dart_types: Vec<dart::Tokens> = method
             .arguments()
             .iter()
-            .map(|arg| {
-                DartCodeOracle::native_dart_type_label(Some(&arg.as_type()))
-            })
+            .map(|arg| DartCodeOracle::native_dart_type_label(Some(&arg.as_type())))
             .collect();
 
         if method.is_async() {
@@ -544,9 +539,7 @@ fn generate_foreign_future_struct_definition(ffi_struct: &FfiStruct) -> dart::To
             let ffi_field_type = field.type_();
             let field_type = match &ffi_field_type {
                 FfiType::RustCallStatus => quote!(RustCallStatus),
-                _ => {
-                    DartCodeOracle::ffi_dart_type_label(Some(&ffi_field_type))
-                }
+                _ => DartCodeOracle::ffi_dart_type_label(Some(&ffi_field_type)),
             };
             if let Some(annotation) = foreign_future_field_annotation(&ffi_field_type) {
                 quote! {
