@@ -8,7 +8,7 @@ pub fn generate_stream(obj: &Object, _type_helper: &dyn TypeHelperRenderer) -> d
     let obj_name = obj.name();
     let fn_name = DartCodeOracle::fn_name(&obj_name.replace("StreamExt", ""));
     let obj_var_name = &DartCodeOracle::var_name(&fn_name);
-    let create_obj_fn_name = format!("createStream{}", &obj_name.replace("StreamExt", ""));
+    let create_obj_fn_name = format!("createStream{}", obj_name.replace("StreamExt", ""));
 
     quote! {
         $fn_name() async* {
