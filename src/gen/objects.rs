@@ -42,9 +42,14 @@ impl CodeType for ObjectCodeType {
 
     fn ffi_converter_name(&self) -> String {
         match self.imp {
-            ObjectImpl::Struct => self.canonical_name().to_string(), // Objects will use factory methods
+            // The converter lives in its own class rather than on the object itself, so
+            // that a Rust method named `read`/`write`/`lower` cannot collide with the
+            // converter's statics (Dart rejects a static and an instance member sharing
+            // a name). Matches how records, enums and callback interfaces are emitted.
+            ObjectImpl::Struct | ObjectImpl::Trait => {
+                format!("FfiConverter{}", self.canonical_name())
+            }
             ObjectImpl::CallbackTrait => format!("FfiConverterCallbackInterface{}", self.id),
-            ObjectImpl::Trait => self.canonical_name().to_string(),
         }
     }
 }
@@ -100,6 +105,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
     }
 
     let cls_name = &DartCodeOracle::class_name(obj.name());
+    let ffi_converter_name = &obj.as_codetype().ffi_converter_name();
     let interface_name = DartCodeOracle::object_interface_name(type_helper.get_ci(), obj);
     let interface_definition = generate_object_interface(obj, &interface_name, type_helper);
     let finalizer_cls_name = &format!("{cls_name}Finalizer");
@@ -196,7 +202,7 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
             class $(&error_handler_name) extends UniffiRustCallStatusErrorHandler {
                 @override
                 Exception lift(RustBuffer errorBuf) {
-                    return $(cls_name).read(errorBuf.asUint8List()).value;
+                    return $(ffi_converter_name).read(errorBuf.asUint8List()).value;
                 }
             }
 
@@ -277,12 +283,28 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
                 return $cls_name._(ptr);
             }
 
-            static Pointer<Void> lower($cls_name value) {
-                return value.uniffiClonePointer();
-            }
-
             Pointer<Void> uniffiClonePointer() {
                 return rustCall((status) => $ffi_object_clone_name(_ptr, status));
+            }
+
+            void dispose() {
+                _$finalizer_cls_name.detach(this);
+                rustCall((status) => $ffi_object_free_name(_ptr, status));
+            }
+
+            $to_string_method
+            $trait_methods
+
+            $(for mt in &obj.methods() => $(generate_method(mt, type_helper)))
+        }
+
+        class $ffi_converter_name {
+            static $cls_name lift(Pointer<Void> ptr) {
+                return $cls_name.lift(ptr);
+            }
+
+            static Pointer<Void> lower($cls_name value) {
+                return value.uniffiClonePointer();
             }
 
             // A Rust pointer is 8 bytes
@@ -301,16 +323,6 @@ pub fn generate_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> da
                 buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
                 return 8;
             }
-
-            void dispose() {
-                _$finalizer_cls_name.detach(this);
-                rustCall((status) => $ffi_object_free_name(_ptr, status));
-            }
-
-            $to_string_method
-            $trait_methods
-
-            $(for mt in &obj.methods() => $(generate_method(mt, type_helper)))
         }
 
         $error_handler_class
@@ -664,6 +676,7 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
     type_helper.include_once_check(obj.name(), &obj.as_type());
 
     let cls_name = &DartCodeOracle::class_name(obj.name());
+    let ffi_converter_name = &obj.as_codetype().ffi_converter_name();
     let impl_name = format!("_{cls_name}Impl");
     let finalizer_field = format!("_{cls_name}ImplFinalizer");
 
@@ -692,6 +705,16 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
                 return $(&impl_name)._internal(ptr);
             }
 
+            void dispose();
+
+            $(for method in abstract_methods => $method)
+        }
+
+        class $ffi_converter_name {
+            static $cls_name lift(Pointer<Void> ptr) {
+                return $cls_name.lift(ptr);
+            }
+
             static Pointer<Void> lower($cls_name value) {
                 if (value is $(&impl_name)) {
                     return value.uniffiClonePointer();
@@ -717,10 +740,6 @@ fn generate_trait_object(obj: &Object, type_helper: &dyn TypeHelperRenderer) -> 
                 buf.buffer.asByteData(buf.offsetInBytes).setInt64(0, handle.address);
                 return 8;
             }
-
-            void dispose();
-
-            $(for method in abstract_methods => $method)
         }
 
         final class $(&impl_name) implements $cls_name {
