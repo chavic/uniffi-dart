@@ -109,8 +109,7 @@ pub fn generate_callback_interface(
             let struct_name = struct_def.name().to_string();
 
             if !type_helper.include_once_by_name(&struct_name) {
-                async_struct_defs
-                    .push(generate_foreign_future_struct_definition(&struct_def, type_helper));
+                async_struct_defs.push(generate_foreign_future_struct_definition(&struct_def));
             }
 
             let completion_name = foreign_future_completion_name(method);
@@ -188,7 +187,7 @@ pub fn generate_callback_interface(
         $async_support
 
         // We must define callback signatures
-        $(generate_callback_methods_signatures(cls_name, methods, type_helper))
+        $(generate_callback_methods_signatures(cls_name, methods))
     };
 
     tokens
@@ -228,11 +227,7 @@ fn generate_callback_methods_definitions(
     )
 }
 
-fn generate_callback_methods_signatures(
-    callback_name: &str,
-    methods: &[&Method],
-    type_helper: &dyn TypeHelperRenderer,
-) -> dart::Tokens {
+fn generate_callback_methods_signatures(callback_name: &str, methods: &[&Method]) -> dart::Tokens {
     let mut tokens = dart::Tokens::new();
     for (method_index, method) in methods.iter().enumerate() {
         //let method_name = DartCodeOracle::fn_name(method.name());
@@ -244,17 +239,13 @@ fn generate_callback_methods_signatures(
         let arg_native_types: Vec<dart::Tokens> = method
             .arguments()
             .iter()
-            .map(|arg| {
-                DartCodeOracle::native_type_label(Some(&arg.as_type()), type_helper.get_ci())
-            })
+            .map(|arg| DartCodeOracle::native_type_label(Some(&arg.as_type())))
             .collect();
 
         let arg_dart_types: Vec<dart::Tokens> = method
             .arguments()
             .iter()
-            .map(|arg| {
-                DartCodeOracle::native_dart_type_label(Some(&arg.as_type()), type_helper.get_ci())
-            })
+            .map(|arg| DartCodeOracle::native_dart_type_label(Some(&arg.as_type())))
             .collect();
 
         if method.is_async() {
@@ -272,7 +263,7 @@ fn generate_callback_methods_signatures(
             });
         } else {
             let method_return_type = if let Some(ret) = method.return_type() {
-                DartCodeOracle::native_type_label(Some(ret), type_helper.get_ci())
+                DartCodeOracle::native_type_label(Some(ret))
             } else {
                 quote!(Void)
             };
@@ -334,7 +325,7 @@ pub fn generate_callback_functions(
             .iter()
             .map(|arg| {
                 let arg_name = DartCodeOracle::var_name(arg.name());
-                DartCodeOracle::callback_param_type(&arg.as_type(), &arg_name, type_helper.get_ci())
+                DartCodeOracle::callback_param_type(&arg.as_type(), &arg_name)
             })
             .collect();
 
@@ -398,15 +389,15 @@ pub fn generate_callback_functions(
                     final obj = FfiConverterCallbackInterface$cls_name._handleMap.get(uniffiHandle);
                     $(arg_lifts)
                     final callback = uniffiFutureCallback.asFunction<$(&completion_dart)>();
-                    final state = _UniffiForeignFutureState();
-                    final handle = _uniffiForeignFutureHandleMap.insert(state);
+                    final state = UniffiForeignFutureState();
+                    final handle = uniffiForeignFutureHandleMap.insert(state);
                     outReturn.ref.handle = handle;
-                    outReturn.ref.free = _uniffiForeignFutureFreePointer;
+                    outReturn.ref.free = uniffiForeignFutureFreePointer;
 
                     () async {
                         try {
                             final result = await obj.$method_name($(for arg in &arg_names => $arg,));
-                            final removedState = _uniffiForeignFutureHandleMap.maybeRemove(handle);
+                            final removedState = uniffiForeignFutureHandleMap.maybeRemove(handle);
                             final effectiveState = removedState ?? state;
                             if (effectiveState.cancelled) {
                                 return;
@@ -421,7 +412,7 @@ pub fn generate_callback_functions(
                                 calloc.free(resultStructPtr);
                             }
                         } catch (e) {
-                            final removedState = _uniffiForeignFutureHandleMap.maybeRemove(handle);
+                            final removedState = uniffiForeignFutureHandleMap.maybeRemove(handle);
                             final effectiveState = removedState ?? state;
                             if (effectiveState.cancelled) {
                                 return;
@@ -538,10 +529,7 @@ fn callback_error_handling(
     }
 }
 
-fn generate_foreign_future_struct_definition(
-    ffi_struct: &FfiStruct,
-    type_helper: &dyn TypeHelperRenderer,
-) -> dart::Tokens {
+fn generate_foreign_future_struct_definition(ffi_struct: &FfiStruct) -> dart::Tokens {
     let struct_name = DartCodeOracle::ffi_struct_name(ffi_struct.name());
     let fields: Vec<dart::Tokens> = ffi_struct
         .fields()
@@ -551,9 +539,7 @@ fn generate_foreign_future_struct_definition(
             let ffi_field_type = field.type_();
             let field_type = match &ffi_field_type {
                 FfiType::RustCallStatus => quote!(RustCallStatus),
-                _ => {
-                    DartCodeOracle::ffi_dart_type_label(Some(&ffi_field_type), type_helper.get_ci())
-                }
+                _ => DartCodeOracle::ffi_dart_type_label(Some(&ffi_field_type)),
             };
             if let Some(annotation) = foreign_future_field_annotation(&ffi_field_type) {
                 quote! {

@@ -6,11 +6,15 @@ use uniffi_bindgen::interface::{AsType, Callable, Type};
 use uniffi_bindgen::ComponentInterface;
 
 use super::oracle::AsCodeType;
-use super::render::{AsRenderable, Renderer, TypeHelperRenderer};
-use super::{enums, functions, objects, records};
+use super::render::{AsRenderable, Renderable, Renderer, TypeHelperRenderer};
+use super::{enums, functions, objects, primitives, records};
 use crate::gen::oracle::DartCodeOracle;
 
 type FunctionDefinition = dart::Tokens;
+
+/// Basename (no extension) of the file holding the shared runtime scaffolding.
+/// Every generated component file imports it; see [`runtime_scaffolding`].
+pub const RUNTIME_MODULE: &str = "uniffi_runtime";
 
 pub struct TypeHelpersRenderer<'a> {
     ci: &'a ComponentInterface,
@@ -148,11 +152,9 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 self.ci.namespace_for_type(ty).expect("external type should have module_path")
             })
             .collect::<BTreeSet<_>>();
-        // The second import statement uses a library prefix, to distinguish conflicting identifiers e.g. RustBuffer vs. ext.RustBuffer
         let imports: dart::Tokens = quote!(
             $( for imp in modules_to_import {
                 $(format!("import \"{}.dart\"", imp));
-                $(format!("import \"{}.dart\"", imp)) as $imp;
             })
         );
 
@@ -167,10 +169,12 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
 
         self.register_component_interface_type_helpers();
 
-        // Let's include the string converter
-        self.register_type_helpers(&Type::String);
+        // `FfiConverterString` is emitted once, into the shared runtime -- the
+        // runtime itself calls it (to lift panic messages), and repeating it here
+        // would collide with the re-exported one.
         let helpers_definitions = quote! {
-            $(for (_, ty) in self.get_include_names().iter() => $(ty.as_renderable().render_type_helper(self)) )
+            $(for (_, ty) in self.get_include_names().iter().filter(|(_, ty)| !matches!(ty, Type::String)) =>
+                $(ty.as_renderable().render_type_helper(self)) )
         };
 
         let types_helper_code = quote! {
@@ -181,10 +185,77 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             import "dart:isolate";
             import "dart:typed_data";
             import "package:ffi/ffi.dart";
+            $(format!("import \"{RUNTIME_MODULE}.dart\";"))
+            // Re-exported so a consumer importing only this file still sees the
+            // shared runtime types that surface in the generated public API.
+            $(format!("export \"{RUNTIME_MODULE}.dart\";"))
             $(imports)
 
             $(types_definitions)
 
+
+            $(helpers_definitions)
+
+        };
+
+        (types_helper_code, function_definitions)
+    }
+}
+
+pub fn generate_type(ty: &Type) -> dart::Tokens {
+    match ty {
+        Type::UInt8
+        | Type::UInt32
+        | Type::Int8
+        | Type::Int16
+        | Type::Int64
+        | Type::UInt16
+        | Type::Int32
+        | Type::UInt64 => quote!(int),
+        Type::Float32 | Type::Float64 => quote!(double),
+        Type::String => quote!(String),
+        Type::Bytes => quote!(Uint8List),
+        Type::Object { name, .. } => quote!($(DartCodeOracle::class_name(name))),
+        Type::Boolean => quote!(bool),
+        Type::Optional { inner_type } => quote!($(generate_type(inner_type))?),
+        Type::Sequence { inner_type } => quote!(List<$(generate_type(inner_type))>),
+        Type::Map { key_type, value_type } => {
+            quote!(Map<$(generate_type(key_type)), $(generate_type(value_type))>)
+        }
+        Type::Enum { name, .. } => quote!($(DartCodeOracle::class_name(name))),
+        Type::Duration => quote!(Duration),
+        Type::Record { name, .. } => quote!($(DartCodeOracle::class_name(name))),
+        Type::Custom { name, .. } => quote!($(DartCodeOracle::class_name(name))),
+        _ => todo!("Type::{:?}", ty),
+    }
+}
+
+/// Runtime scaffolding shared by every generated file.
+///
+/// Emitted once into its own file rather than copied into each component, so
+/// that a type crossing a crate boundary -- an error handler declared in a
+/// dependency, say -- is the *same* Dart type on both sides. Duplicating these
+/// declarations per file makes them nominally distinct and the two halves stop
+/// type-checking against each other.
+///
+/// `ci` only supplies the `rustbuffer_*` symbol names for `RustBuffer`'s own
+/// allocator methods. Every component in a generation links into the same
+/// cdylib and each exports an equivalent implementation, so any component's
+/// names serve for all of them.
+pub fn runtime_scaffolding(ci: &ComponentInterface) -> dart::Tokens {
+    // `StringCodeType` ignores the renderer it is handed; this one just satisfies
+    // the signature.
+    let string_converter =
+        primitives::StringCodeType.render_type_helper(&TypeHelpersRenderer::new(ci));
+
+    quote! {
+        import "dart:async";
+        import "dart:convert";
+        import "dart:ffi";
+        import "dart:io" show Platform, File, Directory;
+        import "dart:isolate";
+        import "dart:typed_data";
+        import "package:ffi/ffi.dart";
 
             class UniffiInternalError implements Exception {
                 static const int bufferOverflow = 0;
@@ -308,11 +379,11 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 external Pointer<Uint8> data;
 
                 static RustBuffer alloc(int size) {
-                    return rustCall((status) => $(self.ci.ffi_rustbuffer_alloc().name())(size, status));
+                    return rustCall((status) => $(ci.ffi_rustbuffer_alloc().name())(size, status));
                 }
 
                 static RustBuffer fromBytes(ForeignBytes bytes) {
-                    return rustCall((status) => $(self.ci.ffi_rustbuffer_from_bytes().name())(bytes, status));
+                    return rustCall((status) => $(ci.ffi_rustbuffer_from_bytes().name())(bytes, status));
                 }
 
                 // static RustBuffer from(Pointer<Uint8> bytes, int len) {
@@ -321,11 +392,11 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 // }
 
                 void free() {
-                    rustCall((status) => $(self.ci.ffi_rustbuffer_free().name())(this, status));
+                    rustCall((status) => $(ci.ffi_rustbuffer_free().name())(this, status));
                 }
 
                 RustBuffer reserve(int additionalCapacity) {
-                return rustCall((status) => $(self.ci.ffi_rustbuffer_reserve().name())(this, additionalCapacity, status));
+                return rustCall((status) => $(ci.ffi_rustbuffer_reserve().name())(this, additionalCapacity, status));
                 }
 
                 Uint8List asUint8List() {
@@ -418,7 +489,6 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 return uint8List;
             }
 
-            $(helpers_definitions)
 
             const int UNIFFI_RUST_FUTURE_POLL_READY = 0;
             const int UNIFFI_RUST_FUTURE_POLL_MAYBE_READY = 1;
@@ -501,21 +571,21 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
             typedef UniffiForeignFutureFree = Void Function(Uint64);
             typedef UniffiForeignFutureFreeDart = void Function(int);
 
-            class _UniffiForeignFutureState {
+            class UniffiForeignFutureState {
                 bool cancelled = false;
             }
 
-            final _uniffiForeignFutureHandleMap = UniffiHandleMap<_UniffiForeignFutureState>();
+            final uniffiForeignFutureHandleMap = UniffiHandleMap<UniffiForeignFutureState>();
 
             void _uniffiForeignFutureFree(int handle) {
-                final state = _uniffiForeignFutureHandleMap.maybeRemove(handle);
+                final state = uniffiForeignFutureHandleMap.maybeRemove(handle);
                 if (state != null) {
                     state.cancelled = true;
                 }
             }
 
             final Pointer<NativeFunction<UniffiForeignFutureFree>>
-                _uniffiForeignFutureFreePointer =
+                uniffiForeignFutureFreePointer =
                     Pointer.fromFunction<UniffiForeignFutureFree>(_uniffiForeignFutureFree);
 
             final class UniffiForeignFuture extends Struct {
@@ -561,9 +631,8 @@ impl Renderer<(FunctionDefinition, dart::Tokens)> for TypeHelpersRenderer<'_> {
                 }
             }
 
-        };
 
-        (types_helper_code, function_definitions)
+        $(string_converter)
     }
 }
 
@@ -582,33 +651,5 @@ mod tests {
 
         let names: Vec<_> = renderer.get_include_names().keys().cloned().collect();
         assert_eq!(names, ["a", "m", "z"]);
-    }
-}
-
-pub fn generate_type(ty: &Type) -> dart::Tokens {
-    match ty {
-        Type::UInt8
-        | Type::UInt32
-        | Type::Int8
-        | Type::Int16
-        | Type::Int64
-        | Type::UInt16
-        | Type::Int32
-        | Type::UInt64 => quote!(int),
-        Type::Float32 | Type::Float64 => quote!(double),
-        Type::String => quote!(String),
-        Type::Bytes => quote!(Uint8List),
-        Type::Object { name, .. } => quote!($(DartCodeOracle::class_name(name))),
-        Type::Boolean => quote!(bool),
-        Type::Optional { inner_type } => quote!($(generate_type(inner_type))?),
-        Type::Sequence { inner_type } => quote!(List<$(generate_type(inner_type))>),
-        Type::Map { key_type, value_type } => {
-            quote!(Map<$(generate_type(key_type)), $(generate_type(value_type))>)
-        }
-        Type::Enum { name, .. } => quote!($(DartCodeOracle::class_name(name))),
-        Type::Duration => quote!(Duration),
-        Type::Record { name, .. } => quote!($(DartCodeOracle::class_name(name))),
-        Type::Custom { name, .. } => quote!($(DartCodeOracle::class_name(name))),
-        _ => todo!("Type::{:?}", ty),
     }
 }
