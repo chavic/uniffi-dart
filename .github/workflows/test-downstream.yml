@@ -79,5 +79,8 @@ jobs:
           uniffi-dart = { path = "../../main" }
           EOF
 
+      - name: Refresh lockfile for patched generator
+        run: cargo update --manifest-path bdk-dart/native/Cargo.toml -p uniffi-dart
+
       - name: Generate dart bindings and run tests
         run: cd bdk-dart && bash scripts/generate_bindings.sh && dart test
