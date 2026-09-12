@@ -78,9 +78,7 @@ pub fn add_f64(left: f64, right: f64) -> Option<f64> {
 
 #[uniffi::export]
 pub fn divide_by_zero(numerator: u64, denominator: u64) -> Result<u64, MathError> {
-    numerator
-        .checked_div(denominator)
-        .ok_or(MathError::DivisionByZero)
+    numerator.checked_div(denominator).ok_or(MathError::DivisionByZero)
 }
 
 macro_rules! get_back {
