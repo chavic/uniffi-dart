@@ -1,6 +1,3 @@
-use thiserror;
-use uniffi;
-
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum MathError {
     #[error("Division by zero")]
