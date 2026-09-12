@@ -71,4 +71,5 @@ jobs:
 
       - name: Clippy
         # Include every fixture and macro crate as well as the generator's CLI.
-        run: cargo clippy --workspace --all-features --all-targets -- -D warnings
+        # UniFFI 0.31 scaffolding requires const MetadataBuffers to build its static metadata.
+        run: cargo clippy --workspace --all-features --all-targets --keep-going -- -D warnings -A clippy::large_const_arrays
