@@ -25,3 +25,11 @@ Rust fixture Clippy passed with warnings denied. Rust formatting and whitespace 
 During harness development, a direct DynamicLibrary lookup opened a different library copy from the native-assets loader. This caused the thread/counter check to fail. Instrumentation now uses the same `@Native` asset ID as generated calls. That check is retained.
 
 See README.md for reproduction and scope limits. The runner writes the complete results JSON and individual subprocess logs to `target/relay-results/` in this checkout. This remains a local fixture-specific prototype; production generator source is unchanged.
+
+## Sharing the runner
+
+The runner now selects desktop library names for Linux, macOS and Windows, permits fresh dependency downloads, and records host/toolchain details without requiring an `upstream` remote. Those portability changes are an invitation to test other 64-bit desktop hosts, not a claim of validated behavior there. Android/iOS need a separate harness.
+
+A one-second watchdog control terminated the Dart child process and recorded `passed: false` and `timed_out: true` in the partial JSON report. It was not accepted as the expected VM-abort control. Runtime success also requires the expected `PASS` marker, not just exit code zero.
+
+No downstream report of this crash has been identified in this investigation. The demonstrated failure remains our reproduction, rather than a confirmed BDK, Payjoin or BeyondTranslate incident.

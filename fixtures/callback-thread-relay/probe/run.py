@@ -1,39 +1,82 @@
 #!/usr/bin/env python3
-"""Local-only generated-UniFFI relay experiment with crash and mutation controls."""
+"""Generated-UniFFI relay experiment with crash and mutation controls."""
 import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
-import resource
 import shutil
 import signal
+import struct
 import subprocess
+import sys
+import time
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--dart', default=os.environ.get('DART', 'dart'))
 parser.add_argument('--toolchain', default='1.85.1')
+parser.add_argument('--offline', action='store_true', help='Use cached Cargo and Dart dependencies only')
+parser.add_argument('--timeout', type=int, default=120, help='Watchdog seconds per Dart runtime case')
 args = parser.parse_args()
-resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+if args.timeout <= 0:
+    parser.error('--timeout must be positive')
+if struct.calcsize('P') != 8:
+    parser.error('This prototype requires a 64-bit host; the 32-bit handle ABI is not covered')
+if sys.platform not in ('linux', 'darwin', 'win32'):
+    parser.error('This runner currently targets Linux, macOS and Windows desktop hosts')
+if os.name != 'nt':
+    import resource
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 fixture = Path(__file__).resolve().parents[1]
 workspace = fixture.parents[1]
 target = Path(os.environ.get('CARGO_TARGET_DIR', workspace / 'target' / 'relay-validation')).resolve()
 output = workspace / 'target' / 'relay-results'
 output.mkdir(parents=True, exist_ok=True)
-env = dict(os.environ, CARGO_TARGET_DIR=str(target), CARGO_NET_OFFLINE='true')
+env = dict(os.environ, CARGO_TARGET_DIR=str(target))
+if args.offline:
+    env['CARGO_NET_OFFLINE'] = 'true'
 results = []
+def git_output(*argv):
+    result = subprocess.run(['git', *argv], cwd=workspace, capture_output=True,
+                            text=True, encoding='utf-8', errors='replace')
+    return result.stdout.strip() if result.returncode == 0 else None
 
-def command(label, argv, cwd=workspace, timeout=120, expected='success'):
+report = {
+    'source_commit': git_output('rev-parse', 'HEAD'),
+    'source_changes': git_output('status', '--porcelain'),
+    'platform': platform.platform(),
+    'architecture': platform.machine(),
+    'python': platform.python_version(),
+    'offline_requested': args.offline,
+    'timeout_seconds': args.timeout,
+    'cases': results,
+}
+def save_report():
+    (output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
+
+def command(label, argv, cwd=workspace, timeout=120, expected='success', marker=None):
+    process_options = ({'creationflags': subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == 'nt'
+                       else {'start_new_session': True})
+    started = time.monotonic()
     process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE,
-                               stderr=subprocess.STDOUT, text=True, start_new_session=True)
+                               stderr=subprocess.STDOUT, text=True, encoding='utf-8',
+                               errors='replace', **process_options)
+    timed_out = False
     try:
         stdout, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
+        timed_out = True
+        if os.name == 'nt':
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if process.poll() is None:
+                process.kill()
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
         stdout, _ = process.communicate()
-        (output / f'{label}.log').write_text(stdout + '\nWATCHDOG TIMEOUT\n')
-        raise RuntimeError(f'{label} timed out after {timeout}s')
+        stdout += f'\nWATCHDOG TIMEOUT after {timeout}s\n'
     (output / f'{label}.log').write_text(stdout)
     code = process.returncode
     if expected == 'crash':
@@ -42,24 +85,33 @@ def command(label, argv, cwd=workspace, timeout=120, expected='success'):
         ok = code != 0 and 'owner state was not updated' in stdout
     else:
         ok = code == 0
-    results.append({'case': label, 'exit': code, 'expectation': expected, 'passed': ok})
+    ok = ok and not timed_out and (marker is None or marker in stdout)
+    results.append({'case': label, 'exit': code, 'expectation': expected, 'passed': ok,
+                    'timed_out': timed_out, 'seconds': round(time.monotonic() - started, 2)})
+    save_report()
     print(f'{label}: exit={code}, expected={expected}, passed={ok}', flush=True)
     if not ok:
         print(stdout[-6000:])
         raise RuntimeError(f'{label} failed its control expectation')
     return stdout
 
+report['dart'] = command('dart-version', [args.dart, '--version']).strip()
+report['rust'] = command('rust-version', ['rustc', '+' + args.toolchain, '--version']).strip()
 command('build', ['cargo', '+' + args.toolchain, 'build', '-p', 'uniffi-dart',
                  '-p', 'callback_thread_relay', '--features', 'uniffi-dart/binary'], timeout=900)
-shared = target / 'debug' / 'libcallback_thread_relay.so'
+library_name = {'linux': 'libcallback_thread_relay.so', 'darwin': 'libcallback_thread_relay.dylib',
+                'win32': 'callback_thread_relay.dll'}[sys.platform]
+shared = target / 'debug' / library_name
 config = output / 'uniffi.toml'
 config.write_text('[bindings.dart]\npackage_name = "relay_probe"\ncdylib_name = "callback_thread_relay"\n')
 generated = output / 'generated'
 generated.mkdir(exist_ok=True)
-command('generate', [str(target / 'debug' / 'uniffi_bindgen_dart'), '--library', str(shared),
+generator_name = 'uniffi_bindgen_dart.exe' if os.name == 'nt' else 'uniffi_bindgen_dart'
+command('generate', [str(target / 'debug' / generator_name), '--library', str(shared),
                     '--out-dir', str(generated), '--config', str(config), '--no-format'])
 component = generated / 'callback_thread_relay.dart'
 original = component.read_text()
+report['generated_sha256'] = hashlib.sha256(original.encode()).hexdigest()
 
 # Native symbol annotations alone enable the relay. The generated method bodies,
 # argument/result converters, callback methods, clone/free code remain unchanged.
@@ -69,6 +121,7 @@ replacements = {
      'call_bytes_direct', 'call_bytes_thread', 'call_bytes_parallel',
      'call_checked_thread', 'call_clone_thread']},
 }
+report['symbol_overrides'] = replacements
 def relay_symbols(source):
     for name, symbol in replacements.items():
         matches = list(re.finditer(r'\bexternal\s+\S+\s+' + re.escape(name) + r'\s*\(', source))
@@ -102,7 +155,8 @@ for variant in ['baseline', 'relay', 'mutation']:
         # the test would be accepting a stubbed result instead of actual state.
         path = package / 'probe.dart'
         content = path.read_text()
-        assert content.count('return ++value;') == 1
+        if content.count('return ++value;') != 1:
+            raise RuntimeError('Expected one callback state mutation site')
         path.write_text(content.replace('return ++value;', 'return value + 1;'))
     (package / 'pubspec.yaml').write_text('''name: relay_probe
 version: 0.0.0
@@ -122,25 +176,24 @@ void main(List<String> args) async {
       package: input.packageName,
       name: 'uniffi:callback_thread_relay',
       linkMode: DynamicLoadingBundled(),
-      file: input.packageRoot.resolve('libcallback_thread_relay.so'),
+      file: input.packageRoot.resolve('__NATIVE_LIBRARY__'),
     ));
   });
 }
-''')
-    command(f'{variant}-pub', [args.dart, 'pub', 'get', '--offline'], cwd=package)
+'''.replace('__NATIVE_LIBRARY__', library_name))
+    command(f'{variant}-pub', [args.dart, 'pub', 'get', *(['--offline'] if args.offline else [])], cwd=package)
     if variant == 'baseline':
-        command('baseline-direct', [args.dart, 'run', 'probe.dart', 'baseline-direct'], cwd=package)
+        command('baseline-direct', [args.dart, 'run', 'probe.dart', 'baseline-direct'], cwd=package,
+                timeout=args.timeout, marker='PASS baseline-direct:')
         command('baseline-thread', [args.dart, 'run', 'probe.dart', 'baseline-thread'], cwd=package,
-                timeout=20, expected='crash')
+                timeout=args.timeout, expected='crash')
     elif variant == 'mutation':
         command('mutation-state', [args.dart, 'run', 'probe.dart', 'thread'], cwd=package,
-                timeout=20, expected='state-failure')
+                timeout=args.timeout, expected='state-failure')
     else:
         for case in ['direct', 'thread', 'parallel', 'clone', 'errors', 'nested', 'repeat']:
-            command('relay-' + case, [args.dart, 'run', 'probe.dart', case], cwd=package, timeout=30)
+            command('relay-' + case, [args.dart, 'run', 'probe.dart', case], cwd=package,
+                    timeout=args.timeout, marker=f'PASS {case}:')
 
-report = {'base': subprocess.check_output(['git', 'merge-base', 'HEAD', 'upstream/main'], cwd=workspace, text=True).strip(),
-          'generated_sha256': hashlib.sha256(original.encode()).hexdigest(),
-          'symbol_overrides': replacements, 'cases': results}
-(output / 'results.json').write_text(json.dumps(report, indent=2) + '\n')
+save_report()
 print('All controls and relay cases passed. Logs:', output)
