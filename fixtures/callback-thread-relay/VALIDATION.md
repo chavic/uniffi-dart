@@ -33,3 +33,5 @@ The runner now selects desktop library names for Linux, macOS and Windows, permi
 A one-second watchdog control terminated the Dart child process and recorded `passed: false` and `timed_out: true` in the partial JSON report. It was not accepted as the expected VM-abort control. Runtime success also requires the expected `PASS` marker, not just exit code zero.
 
 No downstream report of this crash has been identified in this investigation. The demonstrated failure remains our reproduction, rather than a confirmed BDK, Payjoin or BeyondTranslate incident.
+
+The complete run of the shared runner passed on clean commit `85b78bbc0b62e832c7d0190963de57a033fa5200`. The recorded platform, toolchain versions, durations and outcomes are in [results/linux-x64.json](results/linux-x64.json). The subsequent commit only records these results.
