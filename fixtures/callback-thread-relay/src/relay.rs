@@ -1,7 +1,8 @@
 //! Experimental native dispatch for this fixture's exact ABI only.
 //!
-//! Scope: synchronous calls, one Dart isolate, callbacks bounded by the call.
-//! No callback may outlive its relay. No locks are held across Dart execution.
+//! One persistent owner-isolate queue, pumped by nested calls or listener wakes.
+//! No locks are held across generated Dart callback execution.
+use super::owner_queue::Queue;
 use super::UniFfiTraitVtableSink;
 use std::{
     cell::Cell,
@@ -11,18 +12,14 @@ use std::{
         atomic::{AtomicU64, Ordering},
         mpsc, Arc, Mutex, OnceLock,
     },
-    thread::{self, ThreadId},
+    thread,
 };
 use uniffi::{Handle, RustBuffer, RustCallStatus};
 
-type Job = Box<dyn FnOnce() + Send>;
-enum Event {
-    Callback(Job),
-    Done,
-}
-struct Relay {
-    owner: ThreadId,
-    send: mpsc::Sender<Event>,
+type Relay = Queue;
+static OWNER_QUEUE: OnceLock<Arc<Relay>> = OnceLock::new();
+fn owner_queue() -> &'static Arc<Relay> {
+    OWNER_QUEUE.get_or_init(|| Arc::new(Queue::default()))
 }
 static ORIGINAL: OnceLock<UniFfiTraitVtableSink> = OnceLock::new();
 static ROUTES: OnceLock<Mutex<HashMap<u64, Arc<Relay>>>> = OnceLock::new();
@@ -36,19 +33,16 @@ fn routes() -> &'static Mutex<HashMap<u64, Arc<Relay>>> {
     ROUTES.get_or_init(Default::default)
 }
 fn route(handle: u64) -> Arc<Relay> {
-    routes().lock().unwrap().get(&handle).expect("callback outside active relay").clone()
+    routes().lock().unwrap().get(&handle).expect("unknown callback route").clone()
 }
 fn dispatch<R: Send + 'static>(relay: &Relay, call: impl FnOnce() -> R + Send + 'static) -> R {
-    if thread::current().id() == relay.owner {
+    if OWNER_DEPTH.with(|depth| depth.get() != 0) {
         return call();
     }
     let (send, receive) = mpsc::sync_channel(1);
-    relay
-        .send
-        .send(Event::Callback(Box::new(move || {
-            send.send(call()).unwrap();
-        })))
-        .unwrap();
+    relay.push(Box::new(move || {
+        send.send(call()).unwrap();
+    }));
     receive.recv().expect("owner stopped before answering callback")
 }
 
@@ -113,32 +107,62 @@ impl Drop for ActiveGuard {
     fn drop(&mut self) {
         OWNER_DEPTH.with(|depth| depth.set(depth.get() - 1));
         ACTIVE.fetch_sub(1, Ordering::Relaxed);
+        owner_queue().leave();
     }
 }
-struct DoneGuard(mpsc::Sender<Event>);
-impl Drop for DoneGuard {
-    fn drop(&mut self) {
-        let _ = self.0.send(Event::Done);
-    }
+fn enter(from_listener: bool) -> ActiveGuard {
+    owner_queue().enter(from_listener);
+    ACTIVE.fetch_add(1, Ordering::Relaxed);
+    OWNER_DEPTH.with(|depth| depth.set(depth.get() + 1));
+    ActiveGuard
 }
 fn run<R: Send + 'static>(
     handle: Handle,
     work: impl FnOnce(Handle) -> (R, RustCallStatus) + Send + 'static,
 ) -> (R, RustCallStatus) {
-    let (send, receive) = mpsc::channel();
-    let relay = Arc::new(Relay { owner: thread::current().id(), send: send.clone() });
-    assert!(routes().lock().unwrap().insert(handle.as_raw(), relay).is_none());
-    ACTIVE.fetch_add(1, Ordering::Relaxed);
-    OWNER_DEPTH.with(|depth| depth.set(depth.get() + 1));
-    let _active = ActiveGuard;
+    let relay = owner_queue().clone();
+    let _active = enter(false);
+    assert!(routes().lock().unwrap().insert(handle.as_raw(), relay.clone()).is_none());
+    let (send, receive) = mpsc::sync_channel(1);
     let worker = thread::spawn(move || {
-        let _done = DoneGuard(send);
-        work(handle)
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(handle)));
+        send.send(result).unwrap();
+        // Publish completion before waking the owner. A nested pump may consume
+        // this wake, but only this invocation can consume its result.
+        relay.push(Box::new(|| {}));
     });
-    while let Event::Callback(call) = receive.recv().expect("relay channel closed") {
-        call();
+    let result = loop {
+        match receive.try_recv() {
+            Ok(result) => break result,
+            Err(mpsc::TryRecvError::Empty) => {
+                owner_queue().pump_one(true);
+            }
+            Err(mpsc::TryRecvError::Disconnected) => panic!("worker lost completion"),
+        }
+    };
+    worker.join().unwrap();
+    match result {
+        Ok(result) => result,
+        Err(panic) => std::panic::resume_unwind(panic),
     }
-    worker.join().expect("fixture operation panicked outside UniFFI error handling")
+}
+
+#[no_mangle]
+pub extern "C" fn relay_drain() {
+    let _active = enter(true);
+    // Yield back to Dart between batches. Leaving schedules another listener
+    // wake if producers have queued more work, instead of draining indefinitely.
+    for _ in 0..64 {
+        if !owner_queue().pump_one(false) {
+            break;
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn relay_close() -> bool {
+    let routes = routes().lock().unwrap();
+    routes.is_empty() && owner_queue().close()
 }
 
 macro_rules! relay_call {
@@ -164,6 +188,9 @@ relay_call!(
 );
 relay_call!(relay_call_clone_thread, uniffi_callback_thread_relay_fn_func_call_clone_thread, u64);
 relay_call!(relay_call_checked_thread, uniffi_callback_thread_relay_fn_func_call_checked_thread, u32, value: u32);
+relay_call!(relay_call_cross_nested, uniffi_callback_thread_relay_fn_func_call_cross_nested, u64);
+relay_call!(relay_call_saved_thread, uniffi_callback_thread_relay_fn_func_call_saved_thread, u64);
+relay_call!(relay_save_sink, uniffi_callback_thread_relay_fn_func_save_sink, i8);
 
 #[no_mangle]
 pub extern "C" fn relay_stat(which: u32) -> u64 {
@@ -174,6 +201,6 @@ pub extern "C" fn relay_stat(which: u32) -> u64 {
         3 => CLONES.load(Ordering::Relaxed),
         4 => FREES.load(Ordering::Relaxed),
         5 => OWNER_DEPTH.with(|depth| depth.get() as u64),
-        _ => u64::MAX,
+        _ => owner_queue().stat(which),
     }
 }

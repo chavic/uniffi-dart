@@ -10,6 +10,26 @@ import 'callback_thread_relay.dart';
   symbol: 'relay_stat',
 )
 external int stat(int which);
+@Native<Uint64 Function()>(
+  assetId: 'package:relay_probe/uniffi:callback_thread_relay',
+  symbol: 'relay_background_result',
+)
+external int backgroundResult();
+@Native<Void Function(Pointer<NativeFunction<Void Function()>>)>(
+  assetId: 'package:relay_probe/uniffi:callback_thread_relay',
+  symbol: 'relay_set_listener',
+)
+external void setListener(Pointer<NativeFunction<Void Function()>> wake);
+@Native<Void Function()>(
+  assetId: 'package:relay_probe/uniffi:callback_thread_relay',
+  symbol: 'relay_drain',
+)
+external void drain();
+@Native<Bool Function()>(
+  assetId: 'package:relay_probe/uniffi:callback_thread_relay',
+  symbol: 'relay_close',
+)
+external bool closeRelay();
 bool requireOwner = false;
 void check(bool condition, String message) {
   if (!condition) throw StateError(message);
@@ -49,15 +69,45 @@ class NestedSink extends CounterSink {
   }
 }
 
+class CrossNestedSink extends CounterSink {
+  final CounterSink auxiliary = CounterSink(0);
+  CrossNestedSink() : super(100);
+  @override
+  int bytes(Uint8List bytes) {
+    final value = super.bytes(bytes);
+    if (calls == 1) {
+      print('ENTER nested call using outer callback handle');
+      return value + callSavedThread(sink: auxiliary);
+    }
+    return value;
+  }
+}
+
 void clean() {
   check(relayProbeHandleCount() == 0, 'generated Dart callback handles leaked');
   check(stat(0) == 0, 'native callback routes leaked');
   check(stat(1) == 0, 'native relay still active');
 }
 
-void main(List<String> args) {
+Future<void> waitForBackground(int expected) async {
+  final watch = Stopwatch()..start();
+  while (backgroundResult() == 0 &&
+      watch.elapsed < const Duration(seconds: 5)) {
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+  }
+  check(
+    backgroundResult() == expected,
+    'background callback did not complete correctly',
+  );
+}
+
+Future<void> main(List<String> args) async {
   final mode = args.single;
   requireOwner = !mode.startsWith('baseline');
+  final listener = requireOwner
+      ? NativeCallable<Void Function()>.listener(drain)
+      : null;
+  if (listener != null) setListener(listener.nativeFunction);
   final sink = CounterSink(100);
   switch (mode) {
     case 'baseline-direct':
@@ -133,10 +183,68 @@ void main(List<String> args) {
       }
       check(sink.calls == 100 && sink.value == 200, 'repeat callbacks lost');
       check(stat(4) == 100, 'repeat free count wrong');
+    case 'cross-nested':
+      final nested = CrossNestedSink();
+      check(callCrossNested(sink: nested) == 203, 'cross-nested result wrong');
+      check(
+        nested.calls == 2 && nested.value == 102,
+        'cross-nested state wrong',
+      );
+    case 'retained':
+      check(saveSink(sink: sink), 'save failed');
+      check(stat(1) == 0 && stat(0) == 1, 'retained route missing');
+      check(!closeRelay(), 'closed while Rust still owned callback');
+      print('ENTER background callback after original call returned');
+      fireSavedBackground();
+      await waitForBackground(101);
+      check(sink.calls == 1 && sink.value == 101, 'retained state wrong');
+    case 'retained-clone-repeat':
+      for (var i = 0; i < 50; i++) {
+        check(saveSink(sink: sink), 'save failed');
+        fireSavedBackgroundClone();
+        await waitForBackground(101 + i);
+        clean();
+      }
+      check(
+        sink.calls == 50 && sink.value == 150,
+        'retained clone state wrong',
+      );
+      check(
+        stat(3) == 50 && stat(4) == 100,
+        'retained clone/free counts wrong',
+      );
+    case 'shutdown-pending':
+      check(saveSink(sink: sink), 'save failed');
+      fireSavedBackground();
+      // Keep the Dart event loop busy until the worker has queued its request.
+      final watch = Stopwatch()..start();
+      while (stat(6) == 0 && watch.elapsed < const Duration(seconds: 5)) {}
+      check(
+        stat(6) > 0 && stat(7) == 1,
+        'expected queued work and outstanding notification',
+      );
+      check(!closeRelay(), 'closed with a pending native request');
+      await waitForBackground(101);
+      check(sink.calls == 1, 'pending callback lost during close attempt');
     default:
       throw ArgumentError('Unknown case $mode');
   }
   clean();
+  if (listener != null) {
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    while (!closeRelay()) {
+      check(
+        DateTime.now().isBefore(deadline),
+        'relay did not drain before close',
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1));
+    }
+    check(
+      stat(6) == 0 && stat(7) == 0 && stat(8) == 1,
+      'unsafe shutdown state',
+    );
+    listener.close();
+  }
   print(
     'PASS $mode: calls=${sink.calls}, handles=${relayProbeHandleCount()}, routes=${stat(0)}',
   );

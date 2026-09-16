@@ -1,37 +1,24 @@
-# Local validation
+# Owner-dispatch validation
 
-Base: upstream main `e2dd2bb7180609184d0c70ddde0353f5e11d4c3b`.
-Platform: Linux x64; Dart 3.13.0 stable; Rust 1.85.1; UniFFI 0.31.2.
+This draft is based directly on main e2dd2bb7180609184d0c70ddde0353f5e11d4c3b. Production generator code is unchanged.
 
-The runner regenerated bindings from the compiled Rust fixture using this checkout's generator. The original generated component SHA-256 was `27a6e44f3a25000b05708fef815f4aff39a7d23870a4837e763f3e09708c6660`.
+Environment: Linux x64, Dart 3.13.0, Rust 1.85.1, UniFFI 0.31.2. Both JIT and compiled AOT runs pass all 11 positive relay scenarios, the unmodified same-thread baseline, the expected wrong-thread abort, and the state-mutation rejection control: 14 runtime cases per execution mode. Build, generator and package setup checks are recorded separately in the reports.
 
-| Case | Observed result |
-| --- | --- |
-| Unmodified bindings, same-thread callback | Passed; original Dart state updated |
-| Unmodified bindings, Rust worker/join callback | SIGABRT; `Cannot invoke native callback outside an isolate` |
-| Relay, direct callback | Passed |
-| Relay, actual Rust worker/join callback | Passed |
-| Relay, eight concurrent Rust workers, ten calls each | All 80 callbacks accounted for; return sum and original Dart state match |
-| Relay, foreign-handle clone on a worker | One clone and two frees; original Dart object invoked |
-| Relay, declared error and success | Both roundtripped through generated conversions and status handling |
-| Relay, nested Dart/Rust/Dart calls | Passed; both original Dart objects updated |
-| Relay, 100 repeated worker calls | All passed; registries empty after every call |
-| Mutated Dart callback returns the correct first value without changing state | Rejected with `owner state was not updated` |
+| Added case | Original per-call queue | Persistent owner queue |
+| --- | --- | --- |
+| Nested native call reuses outer callback handle | Reaches test marker, then 12-second watchdog timeout | Returns 203 and updates the original object twice |
+| Native callback after creating call returned | SendError panic in extern C; process abort (-6) | Returns 101 through the generated Dart callback; original state updated |
+| 50 retained clone/free cycles | Not separately run | 50 clone callbacks, 100 free callbacks; no handles/routes left after each cycle |
+| Close with pending request and listener notification | No close protocol | Close refuses; callback completes after yielding; final close succeeds |
 
-All seven positive relay cases passed. Both negative controls failed in the required way. Every positive case verified an empty generated Dart callback registry, an empty native route registry and no remaining active relay. This is handle-lifecycle evidence, not a claim of general heap leak freedom.
+The timeout was observed before changing the relay and was not accepted as a passing runtime case. The original retained-callback abort was checked for both the entry marker and SendError. The baseline source and logs are preserved in the root checkout under review/follow-ups/callback-owner-dispatch.
 
-Rust fixture Clippy passed with warnings denied. Rust formatting and whitespace checks passed. The runner checks subprocess exit codes and diagnostic text and enforces watchdogs; an unrelated failure or timeout cannot satisfy the crash control.
+Every successful relay case checks an empty generated callback registry, zero native routes and no active relay. Final close additionally checks no queued jobs, no outstanding listener notification and closed native state before closing the Dart listener. This proves tested handle lifecycle behavior, not general heap leak freedom or forced-teardown safety.
 
-During harness development, a direct DynamicLibrary lookup opened a different library copy from the native-assets loader. This caused the thread/counter check to fail. Instrumentation now uses the same `@Native` asset ID as generated calls. That check is retained.
+All existing direct, worker/join, parallel, clone/free, declared-error, nested and repeated-call cases continue to pass in both modes. The new queue supports retained synchronous callbacks; it does not establish support for async Dart callback methods or cancellation.
 
-See README.md for reproduction and scope limits. The runner writes the complete results JSON and individual subprocess logs to `target/relay-results/` in this checkout. This remains a local fixture-specific prototype; production generator source is unchanged.
+Rust 1.85.1 Clippy for the fixture and all targets passes with warnings denied. Rust/Dart formatting and whitespace checks pass. AOT uses dart build cli so the native asset is bundled; the initial dart compile exe attempt omitted the native asset and failed the same-thread baseline before callback testing. That harness problem was corrected rather than accepted as an expected abort.
 
-## Sharing the runner
+Recorded reports: [JIT](results/linux-x64-jit.json), [AOT](results/linux-x64-aot.json). Fresh runs on 2026-09-16 tested clean commit 816ea89 from the local experiment/callback-owner-dispatch branch. This draft carries the same fixture implementation. The subsequent changes update documentation, copy those reports and add the dedicated CI workflow.
 
-The runner now selects desktop library names for Linux, macOS and Windows, permits fresh dependency downloads, and records host/toolchain details without requiring an `upstream` remote. Those portability changes are an invitation to test other 64-bit desktop hosts, not a claim of validated behavior there. Android/iOS need a separate harness.
-
-A one-second watchdog control terminated the Dart child process and recorded `passed: false` and `timed_out: true` in the partial JSON report. It was not accepted as the expected VM-abort control. Runtime success also requires the expected `PASS` marker, not just exit code zero.
-
-No downstream report of this crash has been identified in this investigation. The demonstrated failure remains our reproduction, rather than a confirmed BDK, Payjoin or BeyondTranslate incident.
-
-The complete run of the shared runner passed on clean commit `85b78bbc0b62e832c7d0190963de57a033fa5200`. The recorded platform, toolchain versions, durations and outcomes are in [results/linux-x64.json](results/linux-x64.json). The subsequent commit only records these results.
+New behavior is validated locally on Linux x64. The Intel macOS/iOS-simulator/Android-emulator results reported on #186 concern the earlier prototype. No new physical-device, ARM32, multi-isolate, async-cancellation or thread-affine-native validation is claimed.

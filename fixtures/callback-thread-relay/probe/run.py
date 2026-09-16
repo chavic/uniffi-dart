@@ -19,6 +19,8 @@ parser.add_argument('--dart', default=os.environ.get('DART', 'dart'))
 parser.add_argument('--toolchain', default='1.85.1')
 parser.add_argument('--offline', action='store_true', help='Use cached Cargo and Dart dependencies only')
 parser.add_argument('--timeout', type=int, default=120, help='Watchdog seconds per Dart runtime case')
+parser.add_argument('--cases', default='direct,thread,parallel,clone,errors,nested,repeat,cross-nested,retained,retained-clone-repeat,shutdown-pending')
+parser.add_argument('--aot', action='store_true', help='Compile and run native executables instead of JIT')
 args = parser.parse_args()
 if args.timeout <= 0:
     parser.error('--timeout must be positive')
@@ -32,7 +34,7 @@ if os.name != 'nt':
 fixture = Path(__file__).resolve().parents[1]
 workspace = fixture.parents[1]
 target = Path(os.environ.get('CARGO_TARGET_DIR', workspace / 'target' / 'relay-validation')).resolve()
-output = workspace / 'target' / 'relay-results'
+output = workspace / 'target' / ('relay-results-aot' if args.aot else 'relay-results')
 output.mkdir(parents=True, exist_ok=True)
 env = dict(os.environ, CARGO_TARGET_DIR=str(target))
 if args.offline:
@@ -51,6 +53,7 @@ report = {
     'python': platform.python_version(),
     'offline_requested': args.offline,
     'timeout_seconds': args.timeout,
+    'execution_mode': 'aot' if args.aot else 'jit',
     'cases': results,
 }
 def save_report():
@@ -120,6 +123,8 @@ replacements = {
  **{f'uniffi_callback_thread_relay_fn_func_{name}': f'relay_{name}' for name in [
      'call_bytes_direct', 'call_bytes_thread', 'call_bytes_parallel',
      'call_checked_thread', 'call_clone_thread']},
+ **{f'uniffi_callback_thread_relay_fn_func_{name}': f'relay_{name}' for name in [
+     'call_cross_nested', 'call_saved_thread', 'save_sink']},
 }
 report['symbol_overrides'] = replacements
 def relay_symbols(source):
@@ -182,17 +187,24 @@ void main(List<String> args) async {
 }
 '''.replace('__NATIVE_LIBRARY__', library_name))
     command(f'{variant}-pub', [args.dart, 'pub', 'get', *(['--offline'] if args.offline else [])], cwd=package)
+    if args.aot:
+        bundle = package / 'aot'
+        executable = bundle / 'bundle' / 'bin' / ('probe.exe' if os.name == 'nt' else 'probe')
+        command(f'{variant}-compile', [args.dart, 'build', 'cli', '--target', 'probe.dart', '-o', str(bundle)], cwd=package)
+        runtime = [str(executable)]
+    else:
+        runtime = [args.dart, 'run', 'probe.dart']
     if variant == 'baseline':
-        command('baseline-direct', [args.dart, 'run', 'probe.dart', 'baseline-direct'], cwd=package,
+        command('baseline-direct', [*runtime, 'baseline-direct'], cwd=package,
                 timeout=args.timeout, marker='PASS baseline-direct:')
-        command('baseline-thread', [args.dart, 'run', 'probe.dart', 'baseline-thread'], cwd=package,
+        command('baseline-thread', [*runtime, 'baseline-thread'], cwd=package,
                 timeout=args.timeout, expected='crash')
     elif variant == 'mutation':
-        command('mutation-state', [args.dart, 'run', 'probe.dart', 'thread'], cwd=package,
+        command('mutation-state', [*runtime, 'thread'], cwd=package,
                 timeout=args.timeout, expected='state-failure')
     else:
-        for case in ['direct', 'thread', 'parallel', 'clone', 'errors', 'nested', 'repeat']:
-            command('relay-' + case, [args.dart, 'run', 'probe.dart', case], cwd=package,
+        for case in args.cases.split(','):
+            command('relay-' + case, [*runtime, case], cwd=package,
                     timeout=args.timeout, marker=f'PASS {case}:')
 
 save_report()
