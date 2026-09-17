@@ -117,3 +117,12 @@ pub fn call_clone_thread(sink: Arc<dyn Sink>) -> u64 {
 }
 
 uniffi::setup_scaffolding!();
+
+#[derive(uniffi::Enum)]
+pub enum ArgumentPayload {
+    Code { value: u32 },
+}
+#[uniffi::export]
+pub fn call_with_payload(sink: Arc<dyn Sink>, _payload: ArgumentPayload) -> u64 {
+    sink.bytes(vec![42])
+}

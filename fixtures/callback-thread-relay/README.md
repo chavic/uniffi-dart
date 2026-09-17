@@ -1,6 +1,14 @@
-# Callback owner-dispatch experiment
+# Callback dispatch experiments and generated bridge
 
-This extends the earlier fixture-specific synchronous relay. Production generator source is unchanged. No downstream incident has been identified in this investigation.
+The opt-in generator now emits a native companion and Dart wrappers. See [the integration guide](../../docs/callback-dispatch.md) for configuration, native-asset packaging, supported API shapes and shutdown requirements.
+
+Run the generated bridge with `python3 fixtures/callback-thread-relay/probe/run_generated.py --dart /path/to/dart`, adding `--aot` for compiled execution. This uses generated adapters, separate endpoint/vtable state per isolate and globally distinct native callback handles. The dedicated CI workflow runs both modes.
+
+The remainder describes the earlier handwritten relay, retained as a baseline and failure-control harness. Its limits and older device reports are separate from generated-bridge results.
+
+## Earlier owner-dispatch experiment
+
+The handwritten experiment extended the earlier fixture-specific synchronous relay without changing the production generator. No downstream incident has been identified in this investigation.
 
 The original relay uses temporary queues. A nested call invoking an outer callback handle deadlocks because only the inner queue is serviced. A callback retained after its originating call returns aborts when it sends to the closed queue. Both were reproduced before changing dispatch.
 
