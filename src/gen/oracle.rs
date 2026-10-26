@@ -1,7 +1,7 @@
 use genco::lang::dart;
 use genco::quote;
 use heck::{ToLowerCamelCase, ToUpperCamelCase};
-use uniffi_bindgen::interface::{Argument, AsType, Callable, FfiType, Object, ObjectImpl, Type};
+use uniffi_bindgen::interface::{Argument, AsType, Callable, FfiType, Object, Type};
 use uniffi_bindgen::ComponentInterface;
 
 // use super::render::{AsRenderable, Renderable};
@@ -129,7 +129,7 @@ impl DartCodeOracle {
                 FfiType::Float64 => quote!(double),
                 FfiType::RustBuffer(_) => quote!(RustBuffer),
                 FfiType::ForeignBytes => quote!(ForeignBytes),
-                FfiType::Handle => quote!(Pointer<Void>),
+                FfiType::Handle => quote!(int),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
                 FfiType::Reference(inner) => quote!($(Self::ffi_type_label_by_reference(inner))),
                 _ => panic!("Unimplemented FfiType: {ret_type:?}"), // Fallback implementation
@@ -154,7 +154,7 @@ impl DartCodeOracle {
                 FfiType::Float64 => quote!(Double),
                 FfiType::RustBuffer(_) => quote!(RustBuffer),
                 FfiType::ForeignBytes => quote!(ForeignBytes),
-                FfiType::Handle => quote!(Pointer<Void>),
+                FfiType::Handle => quote!(Uint64),
                 FfiType::Callback(name) => quote!($(Self::ffi_callback_name(name))),
                 FfiType::Reference(inner) => quote!($(Self::ffi_type_label_by_reference(inner))),
                 _ => panic!("Unimplemented FfiType: {ret_type:?}"), // Fallback implementation
@@ -177,6 +177,7 @@ impl DartCodeOracle {
             FfiType::Float32 => quote!(Float),
             FfiType::Float64 => quote!(Double),
             FfiType::RustBuffer(_) => quote!(RustBuffer),
+            FfiType::Handle => quote!(Pointer<Uint64>),
             FfiType::Callback(name) => quote!(Pointer<$(Self::ffi_callback_name(name))>),
             FfiType::Struct(name) => quote!(Pointer<$(Self::ffi_struct_name(name))>),
             _ => quote!(Pointer<Void>), // Fallback implementation
@@ -402,14 +403,13 @@ impl DartCodeOracle {
                 },
                 Type::Sequence { .. } => quote!(RustBuffer),
                 Type::Map { .. } => quote!(RustBuffer),
-                Type::Object { .. } => quote!(Pointer<Void>),
+                Type::Object { .. } | Type::CallbackInterface { .. } => quote!(Uint64),
                 Type::Enum { .. } => quote!(Int32),
                 Type::Record { .. } => quote!(RustBuffer),
                 // A custom type is only a Dart-level alias; across the FFI it is
                 // represented by its builtin, so recurse rather than emitting the
                 // alias name (which is not a `NativeType`).
                 Type::Custom { builtin, .. } => Self::native_type_label(Some(builtin)),
-                _ => quote!(Pointer<Void>),
             }
         } else {
             quote!(Void)
@@ -441,13 +441,12 @@ impl DartCodeOracle {
                 },
                 Type::Sequence { .. } => quote!(RustBuffer),
                 Type::Map { .. } => quote!(RustBuffer),
-                Type::Object { .. } => quote!(Pointer<Void>),
+                Type::Object { .. } | Type::CallbackInterface { .. } => quote!(int),
                 Type::Enum { .. } => quote!(int),
                 Type::Record { .. } => quote!(RustBuffer),
                 // See `native_type_label`: custom types are Dart-level aliases and
                 // cross the FFI as their builtin.
                 Type::Custom { builtin, .. } => Self::native_dart_type_label(Some(builtin)),
-                _ => quote!(dynamic),
             }
         } else {
             quote!(void)
@@ -514,7 +513,7 @@ impl DartCodeOracle {
                     $call_status.code = CALL_SUCCESS;
                 )
             }
-            Type::Object { .. } => {
+            Type::Object { .. } | Type::CallbackInterface { .. } => {
                 let lowered = ret_type.as_codetype().ffi_converter_name();
                 quote!(
                     final result = obj.$method_name($(for arg in &args => $arg,));
@@ -563,7 +562,7 @@ impl DartCodeOracle {
                 Type::Float32 => quote!(Pointer<Float>),
                 Type::Float64 => quote!(Pointer<Double>),
                 Type::Boolean => quote!(Pointer<Int8>),
-                Type::Object { .. } => quote!(Pointer<Pointer<Void>>),
+                Type::Object { .. } | Type::CallbackInterface { .. } => quote!(Pointer<Uint64>),
                 _ => quote!(Pointer<RustBuffer>),
             }
         } else {
@@ -628,14 +627,9 @@ impl DartCodeOracle {
         }
     }
 
-    /// Lower argument with special handling for callback traits
+    /// Lower arguments, including callback values, to their UniFFI wire types.
     pub fn lower_arg_with_callback_handling(arg: &Argument) -> dart::Tokens {
-        let base_lower = Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name()))));
-        match arg.as_type() {
-            Type::Object { imp: ObjectImpl::CallbackTrait, .. } => base_lower,
-            Type::CallbackInterface { .. } => quote!($base_lower.address),
-            _ => base_lower,
-        }
+        Self::type_lower_fn(&arg.as_type(), quote!($(Self::var_name(arg.name()))))
     }
 
     pub fn object_interface_name(_ci: &ComponentInterface, obj: &Object) -> String {

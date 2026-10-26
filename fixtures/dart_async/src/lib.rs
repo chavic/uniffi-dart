@@ -538,3 +538,14 @@ pub trait AsyncNameCallback: Send + Sync {
 pub async fn check_async_callback_names(callback: Arc<dyn AsyncNameCallback>) -> i32 {
     callback.sum(1, 2, 3, 4, 5, 6, 7).await
 }
+
+#[uniffi::export(with_foreign)]
+#[async_trait::async_trait]
+pub trait AsyncObjectFactory: Send + Sync {
+    async fn make(&self) -> Arc<Megaphone>;
+}
+
+#[uniffi::export]
+pub async fn make_using_foreign_factory(factory: Arc<dyn AsyncObjectFactory>) -> Arc<Megaphone> {
+    factory.make().await
+}
