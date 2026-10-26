@@ -153,3 +153,11 @@ uniffi-dart version and `A.B.C` is the targeted uniffi-rs version.
 The code is released under MIT License. See the LICENSE file in the repository root for details.
 
 The project is building on top of the great work of Mozillas UniFFI, with inspirations from other external frontends (like Kotlin and Go) and with the help of the [ffi-gen](https://github.com/acterglobal/ffi-gen) lib. Thanks folks!
+
+### Timestamp values
+
+Generated `SystemTime` values use Dart `DateTime`. Rust timestamps are returned
+in UTC; use `isAtSameMomentAs` to compare an echoed local value, since `==` also
+compares the UTC flag. Submicrosecond precision is truncated. Inputs strictly
+between one second before the Unix epoch and the epoch are rejected because
+UniFFI 0.31.2 cannot preserve their sign.

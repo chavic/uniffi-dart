@@ -124,3 +124,13 @@ fn set_seconds_before_unix_epoch(seconds: u64) -> Result<SystemTime> {
 type Result<T, E = ChronologicalError> = std::result::Result<T, E>;
 
 uniffi::include_scaffolding!("api");
+
+#[derive(uniffi::Record)]
+pub struct Timestamp {
+    pub value: u32,
+}
+
+#[uniffi::export]
+pub fn echo_named_timestamp(value: Timestamp) -> Timestamp {
+    value
+}

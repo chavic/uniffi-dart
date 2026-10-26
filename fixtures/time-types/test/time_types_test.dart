@@ -22,6 +22,9 @@ class EchoTime extends TimeSource {
 }
 
 void main() {
+  test('Timestamp record coexists with SystemTime', () {
+    expect(echoNamedTimestamp(value: Timestamp(value: 7)).value, 7);
+  });
   final epoch = DateTime.fromMicrosecondsSinceEpoch(0, isUtc: true);
 
   test('epoch and microsecond boundaries round trip through Rust', () {
@@ -165,9 +168,9 @@ void main() {
     final value = epoch.subtract(
       const Duration(seconds: 2, microseconds: 123456),
     );
-    expect(FfiConverterTimestamp.write(value, slice), 12);
+    expect(FfiConverter_UniffiTimestamp.write(value, slice), 12);
     expect(slice, timestampBytes(-2, 123456000));
-    final read = FfiConverterTimestamp.read(slice);
+    final read = FfiConverter_UniffiTimestamp.read(slice);
     expect(read.value, value);
     expect(read.bytesRead, 12);
     expect(backing.take(4), everyElement(0xaa));
@@ -177,14 +180,15 @@ void main() {
   test('DateTime endpoints are checked before integer multiplication', () {
     const maxSeconds = 8640000000000;
     for (final seconds in [-maxSeconds, maxSeconds]) {
-      final decoded = FfiConverterTimestamp.read(timestampBytes(seconds, 0))
-          .value;
+      final decoded = FfiConverter_UniffiTimestamp.read(
+        timestampBytes(seconds, 0),
+      ).value;
       expect(decoded.microsecondsSinceEpoch, seconds * 1000000);
       final bytes = Uint8List(12);
-      FfiConverterTimestamp.write(decoded, bytes);
+      FfiConverter_UniffiTimestamp.write(decoded, bytes);
       expect(bytes, timestampBytes(seconds, 0));
       expect(
-        () => FfiConverterTimestamp.read(timestampBytes(seconds, 1)),
+        () => FfiConverter_UniffiTimestamp.read(timestampBytes(seconds, 1)),
         throwsRangeError,
       );
     }
@@ -195,7 +199,7 @@ void main() {
       9223372036854775807,
     ]) {
       expect(
-        () => FfiConverterTimestamp.read(timestampBytes(seconds, 0)),
+        () => FfiConverter_UniffiTimestamp.read(timestampBytes(seconds, 0)),
         throwsRangeError,
       );
     }
@@ -205,7 +209,7 @@ void main() {
     final backing = Uint8List(20)..fillRange(0, 20, 0xaa);
     final shortView = Uint8List.sublistView(backing, 4, 15);
     expect(
-      () => FfiConverterTimestamp.write(epoch, shortView),
+      () => FfiConverter_UniffiTimestamp.write(epoch, shortView),
       throwsRangeError,
     );
     expect(backing, everyElement(0xaa));
@@ -214,13 +218,16 @@ void main() {
   test('malformed nanos and short byte views are rejected', () {
     for (final nanos in [1000000000, 0xffffffff]) {
       expect(
-        () => FfiConverterTimestamp.read(timestampBytes(0, nanos)),
+        () => FfiConverter_UniffiTimestamp.read(timestampBytes(0, nanos)),
         throwsFormatException,
       );
     }
     for (final length in [0, 8, 11]) {
       final bytes = Uint8List.sublistView(Uint8List(20), 4, 4 + length);
-      expect(() => FfiConverterTimestamp.read(bytes), throwsFormatException);
+      expect(
+        () => FfiConverter_UniffiTimestamp.read(bytes),
+        throwsFormatException,
+      );
     }
   });
 
@@ -231,7 +238,7 @@ void main() {
         final value = DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true);
         final bytes = Uint8List(12)..fillRange(0, 12, 0xaa);
         expect(
-          () => FfiConverterTimestamp.write(value, bytes),
+          () => FfiConverter_UniffiTimestamp.write(value, bytes),
           throwsRangeError,
         );
         expect(bytes, everyElement(0xaa));
@@ -239,4 +246,61 @@ void main() {
       }
     },
   );
+
+  test('unrepresentable timestamps are rejected during sizing', () {
+    expect(FfiConverter_UniffiTimestamp.allocationSize(), 12);
+    expect(FfiConverter_UniffiTimestamp.allocationSize(epoch), 12);
+    for (final micros in [-1, -500000, -999999]) {
+      final invalid = DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true);
+      expect(
+        () => FfiConverter_UniffiTimestamp.allocationSize(invalid),
+        throwsRangeError,
+      );
+      // Sizing runs before any containing record field is written or cloned.
+      expect(
+        () => echoTimeBundle(
+          value: TimeBundle(
+            at: invalid,
+            optionalAt: null,
+            history: [],
+            named: {},
+          ),
+        ),
+        throwsRangeError,
+      );
+      expect(
+        () => echoTimeBundle(
+          value: TimeBundle(
+            at: epoch,
+            optionalAt: invalid,
+            history: [],
+            named: {},
+          ),
+        ),
+        throwsRangeError,
+      );
+      expect(
+        () => echoTimeBundle(
+          value: TimeBundle(
+            at: epoch,
+            optionalAt: null,
+            history: [epoch, invalid],
+            named: {},
+          ),
+        ),
+        throwsRangeError,
+      );
+      expect(
+        () => echoTimeBundle(
+          value: TimeBundle(
+            at: epoch,
+            optionalAt: null,
+            history: [],
+            named: {'bad': invalid},
+          ),
+        ),
+        throwsRangeError,
+      );
+    }
+  });
 }

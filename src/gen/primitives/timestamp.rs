@@ -4,7 +4,7 @@ use super::paste;
 use crate::gen::quote;
 use crate::gen::render::{Renderable, TypeHelperRenderer};
 
-impl_code_type_for_primitive!(TimestampCodeType, "DateTime", "Timestamp");
+impl_code_type_for_primitive!(TimestampCodeType, "DateTime", "_UniffiTimestamp");
 
 impl Renderable for TimestampCodeType {
     fn render_type_helper(&self, _type_helper: &dyn TypeHelperRenderer) -> dart::Tokens {
@@ -12,7 +12,7 @@ impl Renderable for TimestampCodeType {
             // UniFFI timestamps use signed offset seconds and unsigned nanoseconds.
             // Dart exposes UTC DateTime values, truncating submicrosecond precision
             // toward the Unix epoch. Converters borrow incoming RustBuffers.
-            class FfiConverterTimestamp {
+            class FfiConverter_UniffiTimestamp {
                 static DateTime lift(RustBuffer buf) {
                     return read(buf.asUint8List()).value;
                 }
@@ -45,12 +45,7 @@ impl Renderable for TimestampCodeType {
                         DateTime.fromMicrosecondsSinceEpoch(micros, isUtc: true), 12);
                 }
 
-                static int allocationSize([DateTime? value]) => 12;
-
-                static int write(DateTime value, Uint8List buf) {
-                    if (buf.length < 12) {
-                        throw RangeError("Timestamp requires 12 bytes");
-                    }
+                static void _checkRepresentable(DateTime value) {
                     final micros = value.microsecondsSinceEpoch;
                     // UniFFI stores the sign only in whole seconds. A negative
                     // subsecond offset would otherwise be encoded as a positive one.
@@ -58,6 +53,23 @@ impl Renderable for TimestampCodeType {
                         throw RangeError(
                             "UniFFI cannot represent timestamps less than one second before the Unix epoch");
                     }
+                }
+
+                static int allocationSize([DateTime? value]) {
+                    // Validate during sizing: it runs before any field of a
+                    // containing record is written or cloned.
+                    if (value != null) {
+                        _checkRepresentable(value);
+                    }
+                    return 12;
+                }
+
+                static int write(DateTime value, Uint8List buf) {
+                    if (buf.length < 12) {
+                        throw RangeError("Timestamp requires 12 bytes");
+                    }
+                    _checkRepresentable(value);
+                    final micros = value.microsecondsSinceEpoch;
                     final bytes = buf.buffer.asByteData(buf.offsetInBytes, 12);
                     final magnitude = micros.abs();
                     final seconds = magnitude ~/ 1000000;
