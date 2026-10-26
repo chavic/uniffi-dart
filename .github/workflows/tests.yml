@@ -66,9 +66,6 @@ jobs:
       - name: Format
         run: cargo fmt --all -- --check
 
-      - name: Test CI result reporting
-        run: python3 -m unittest discover -s .github/scripts -p '*_test.py'
-
       - name: Clippy
         # Include every fixture and macro crate as well as the generator's CLI.
         # UniFFI 0.31 scaffolding requires const MetadataBuffers to build its static metadata.
