@@ -29,7 +29,17 @@ impl Renderable for DurationCodeType {
                 static LiftRetVal<Duration> read( Uint8List buf) {
                     final bytes = buf.buffer.asByteData(buf.offsetInBytes, 12);
                     final seconds = bytes.getUint64(0);
-                    final micros = (bytes.getUint32(8) ~/ 1000);
+                    final nanos = bytes.getUint32(8);
+                    if (nanos >= 1000000000) {
+                        throw FormatException("Invalid duration nanoseconds");
+                    }
+                    final micros = nanos ~/ 1000;
+                    const maxSeconds = 9223372036854;
+                    const maxRemainderMicros = 775807;
+                    if (seconds < 0 || seconds > maxSeconds ||
+                        (seconds == maxSeconds && micros > maxRemainderMicros)) {
+                        throw RangeError("Duration outside Dart microsecond range");
+                    }
                     return LiftRetVal(Duration(seconds: seconds, microseconds: micros), 12);
                 }
 

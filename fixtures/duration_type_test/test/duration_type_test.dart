@@ -5,6 +5,33 @@ import 'package:test/test.dart';
 import '../duration_type_test.dart';
 
 void main() {
+  test('native duration bounds reject overflow and invalid nanos', () {
+    Uint8List wire(int seconds, int nanos) {
+      final bytes = ByteData(12)
+        ..setUint64(0, seconds)
+        ..setUint32(8, nanos);
+      return bytes.buffer.asUint8List();
+    }
+
+    expect(
+      FfiConverterDuration.read(wire(9223372036854, 775807999))
+          .value
+          .inMicroseconds,
+      9223372036854775807,
+    );
+    for (final input in [
+      wire(9223372036854, 775808000),
+      wire(9223372036855, 0),
+      wire(-1, 999999999),
+    ]) {
+      expect(() => FfiConverterDuration.read(input), throwsRangeError);
+    }
+    expect(
+      () => FfiConverterDuration.read(wire(0, 1000000000)),
+      throwsFormatException,
+    );
+    expect(maximumDuration, throwsRangeError);
+  });
   final negativeDurations = [
     Duration(microseconds: -1),
     Duration(seconds: -1),

@@ -38,3 +38,8 @@ pub fn echo_duration_sequence(values: Vec<Duration>) -> Vec<Duration> {
 }
 
 uniffi::include_scaffolding!("api");
+
+#[uniffi::export]
+pub fn maximum_duration() -> Duration {
+    Duration::MAX
+}
