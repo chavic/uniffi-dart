@@ -188,6 +188,16 @@ pub fn check_returning_callback(callback: Arc<dyn ReturningConsumer>, fail: bool
     }
 }
 
+#[uniffi::export(callback_interface)]
+pub trait PureConsumer: Send + Sync {
+    fn ping(&self);
+}
+#[uniffi::export]
+pub fn take_pure_callback(consumer: Box<dyn PureConsumer>, small: u8) -> u8 {
+    consumer.ping();
+    small
+}
+
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 #[uniffi::export(Display, Debug)]
 pub enum FormatError {
