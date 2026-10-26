@@ -341,6 +341,12 @@ pub fn generate_callback_functions(
             })
             .collect();
 
+        // The callback boundary owns every incoming serialized argument, including
+        // those not reached if an earlier argument fails to lift.
+        let free_buffers = quote!($(for (index, _) in m.arguments().iter().enumerate().filter(|(_, arg)| matches!(FfiType::from(&arg.as_type()), FfiType::RustBuffer(_))) =>
+            uniffiFreeRustBuffer($(format!("_uniffiRaw{index}")));
+        ));
+
         // Prepare arg names for the method call using indexes
         let arg_names: Vec<dart::Tokens> = m
             .arguments()
@@ -387,6 +393,7 @@ pub fn generate_callback_functions(
                     int uniffiCallbackData,
                     Pointer<UniffiForeignFuture> outReturn,
                 ) {
+                    try {
                     final callback = uniffiFutureCallback.asFunction<$(&completion_dart)>();
                     final state = UniffiForeignFutureState();
                     final handle = uniffiForeignFutureHandleMap.insert(state);
@@ -432,6 +439,9 @@ pub fn generate_callback_functions(
                             uniffiForeignFutureHandleMap.maybeRemove(handle);
                         }
                     }();
+                    } finally {
+                        $free_buffers
+                    }
                 }
 
                 final Pointer<NativeFunction<$ffi_method_type>> $(callback_method_name)Pointer =
@@ -461,6 +471,8 @@ pub fn generate_callback_functions(
                         $call_dart_method
                     } catch (e) {
                         $sync_error_handling
+                    } finally {
+                        $free_buffers
                     }
                 }
 
