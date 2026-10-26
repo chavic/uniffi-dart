@@ -9,6 +9,12 @@ import 'callback_thread_relay.dart';
   symbol: 'relay_background_result',
 )
 external int backgroundResult();
+@Native<Uint64 Function()>(
+  assetId: 'package:relay_probe/uniffi:callback_thread_relay',
+  symbol: 'relay_call_saved_on_owner',
+)
+external int callSavedOnOwner();
+
 void check(bool value, String message) {
   if (!value) throw StateError(message);
 }
@@ -112,6 +118,16 @@ Future<void> main(List<String> args) async {
   final mode = args.single;
   final sink = Counter(100);
   switch (mode) {
+    case 'no-callback':
+      check(echoScalar(value: 42) == 42, 'scalar call');
+      print('PASS generated $mode');
+      return;
+    case 'owner-direct':
+      check(saveSink(sink: sink), 'save failed');
+      check(callSavedOnOwner() == 101 && sink.value == 101, 'owner callback');
+    case 'thread-local-drop':
+      saveUntilThreadExit(sink: sink);
+      check(sink.calls == 0, 'drop called a method');
     case 'direct':
       check(
         callBytesDirect(sink: sink) == 101 && sink.value == 101,

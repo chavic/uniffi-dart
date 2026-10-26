@@ -2,7 +2,11 @@
 
 Generated Dart callbacks normally use `Pointer.fromFunction`, which aborts when Rust invokes them from another thread. The dispatcher keeps callback execution in the owning Dart isolate and moves native entry calls to workers. Dart-facing calls and callback methods remain synchronous; the original callback objects and their mutable state remain in that isolate.
 
-This is experimental and disabled by default. No downstream report of the original worker-thread crash has been identified in this investigation.
+This is experimental and disabled by default. **Do not use it in `Isolate.run`,
+Flutter `compute`, hot restart, or isolates that can be killed while Rust retains
+callbacks. Those lifetimes can invalidate native callback pointers and abort the
+process. Every owning isolate must remain alive until Rust has released its
+callbacks and graceful shutdown has completed.** No downstream report of the original worker-thread crash has been identified in this investigation.
 
 ## Enable and package
 
@@ -33,21 +37,23 @@ output.assets.code.add(CodeAsset(
 
 The generated crate README records the exact library basename and full asset ID. The existing original-library asset stays registered too. Generated wrappers resolve original entry points through `Native.addressOf`; the companion does not statically link a second copy of the original library.
 
+The bindings and the companion carry the same generated ABI hash over every exported companion symbol and signature. The dispatcher compares them on first use and throws a `StateError` if they differ, so a stale companion fails loudly instead of calling through mismatched `dispatch_*` signatures. Rebuild the companion whenever you regenerate the bindings.
+
 The generated probe includes a complete two-asset hook and tests the result as both JIT and an AOT application built with `dart build cli`.
 
 ## Supported scope
 
 This version supports one component per generated package on 64-bit native targets, with synchronous Rust functions and synchronous Dart callback interfaces/traits. It handles worker/join calls, nested callbacks, retained callbacks between native calls, clone/free, declared callback errors and multiple Dart isolates using the same native library.
 
-Generation rejects async Rust APIs, async Dart callbacks, Rust object types, callback values returned to Dart, callback values nested in records/enums or passed through callback methods, and external component types. It also rejects direct callback enum/duration/timestamp/custom wire types until their existing converter mismatches are resolved. The companion refuses to compile for 32-bit targets. These limits are checked before producing a bridge that would silently use an unsupported ABI or lifetime path.
+Generation rejects async Rust APIs, async Dart callbacks, Rust object types, callback values returned to Dart, callback values nested in records/enums or passed through callback methods, and external component types. It also rejects direct callback enum/duration/timestamp/custom wire types until their existing converter mismatches are resolved. The companion refuses to compile for 32-bit targets. Until the fixed-width-handle work is integrated and validated here, Flutter Android builds must explicitly exclude `armeabi-v7a`, for example `flutter build apk --target-platform android-arm64,android-x64`. These limits are checked before producing a bridge that would silently use an unsupported ABI or lifetime path.
 
 Do not mix dispatched and ordinary bindings for the same Rust component in one process: UniFFI installs callback vtables process-wide. Each isolate using dispatched bindings gets its own copied Dart vtables and local handle registry. Native handles include routing through a process-wide registry, so two isolates can both allocate local handle 1 safely.
 
-Opting in moves native entry calls, including calls without callback arguments, to fresh worker threads. Libraries that require calls on a particular thread must not use this mode. Thread creation adds overhead. Reentrant callbacks still need the Rust application to release any locks that a nested call would acquire.
+Opting in moves native entry calls, including calls without callback arguments, to fresh worker threads. A coordinator waits for worker thread-local destructors while the owner keeps pumping callbacks. Libraries that require calls on a particular thread must not use this mode. Two thread creations per native call add overhead; this mode is intended for operations whose native work outweighs that cost. Reentrant callbacks still need the Rust application to release any locks that a nested call would acquire.
 
 ## Lifetime and shutdown
 
-While a Dart call waits for native work, it pumps its own queue. Between calls, `NativeCallable.listener` wakes the owner isolate to drain requests. Requests keep their inputs alive until completion, and no queue or route lock is held while invoking Dart. Dispatch uses active endpoint identity rather than assuming an isolate always runs on the same OS thread.
+While a Dart call waits for native work, it pumps its own queue. Between calls, `NativeCallable.listener` wakes the owner isolate to drain requests. Requests keep their inputs alive until completion, and no queue or route lock is held while invoking Dart. Dispatch uses active endpoint identity and the Dart VM's isolate-ownership check rather than assuming an isolate always runs on the same OS thread. Callbacks made directly on the owning isolate outside a dispatched call execute inline.
 
 If lowering a later argument fails before a native call starts, generated wrappers roll back callback registrations from that call. Once the native call starts, Rust owns those handles and releases them through its callback free path.
 
@@ -61,7 +67,7 @@ while (!closeCallbackDispatcher()) {
 
 In an application, use a timeout or an explicit native shutdown acknowledgement rather than retrying indefinitely. `false` means a callback handle, native call, queued request or listener notification remains. A successful close removes the native endpoint, releases its copied vtables and closes the Dart listener. Close is idempotent. Do not call the bindings after successful close.
 
-The listener deliberately keeps its isolate alive until close. Forced isolate termination, abandoned workers and cancellation are not supported; killing an isolate while Rust retains its callbacks can still invalidate native callback pointers. Supporting async callbacks requires a separate invocation path that yields to Dart's event loop, not a synchronous queue pump.
+The listener keeps its isolate alive only while native callback routes exist. Calls that retain no callbacks allow a CLI to exit naturally; explicit close still releases the endpoint promptly. Forced isolate termination, abandoned workers and cancellation are not supported; killing an isolate while Rust retains its callbacks can still invalidate native callback pointers. Supporting async callbacks requires a separate invocation path that yields to Dart's event loop, not a synchronous queue pump.
 
 ## Reproduce
 
@@ -74,7 +80,7 @@ python3 fixtures/callback-thread-relay/probe/run_generated.py --dart /path/to/da
 
 The runner builds the original library, generates the bridge, builds the companion and packages both native assets. It exercises 12 scenarios, including two concurrent isolates, 100 repeated calls and 50 retained clone/free cycles. Removing callback-registration rollback makes the failed-lowering shutdown test fail. A state-mutation control must fail even though it returns the expected scalar value. Timeouts fail every case.
 
-The older handwritten relay runner remains as a baseline with the unmodified worker-thread abort control. The generated runner does not use that relay or replace generated native symbols with fixture-specific adapters.
+The earlier handwritten relay and historical reports are retained in git history at `c76728a`; the generated fixture now contains only the generated-bridge probe.
 
 Local validation uses Linux x64, Dart 3.13.0, Rust 1.85.1 and UniFFI 0.31.2. Fresh device runs are needed; results previously reported for the handwritten prototype do not validate this generated bridge.
 

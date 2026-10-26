@@ -14,6 +14,7 @@ use std::{
         mpsc, Arc, Condvar, Mutex, OnceLock,
     },
     thread,
+    time::Duration,
 };
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -46,6 +47,31 @@ impl<T> Transfer<T> {
 }
 type Job = Box<dyn FnOnce() + Send>;
 type Wake = extern "C" fn();
+type CurrentIsolate = unsafe extern "C" fn() -> *mut std::ffi::c_void;
+#[repr(C)]
+struct DartApiEntry {
+    name: *const std::ffi::c_char,
+    function: *const (),
+}
+#[repr(C)]
+struct DartApi {
+    major: i32,
+    minor: i32,
+    functions: *const DartApiEntry,
+}
+unsafe fn current_isolate_api(data: *const DartApi) -> Option<CurrentIsolate> {
+    if data.is_null() || (*data).major != 2 {
+        return None;
+    }
+    let mut entry = (*data).functions;
+    while !(*entry).name.is_null() {
+        if std::ffi::CStr::from_ptr((*entry).name).to_bytes() == b"Dart_CurrentIsolate" {
+            return Some(std::mem::transmute::<*const (), CurrentIsolate>((*entry).function));
+        }
+        entry = entry.add(1);
+    }
+    None
+}
 #[derive(Default)]
 struct State {
     jobs: VecDeque<Job>,
@@ -56,6 +82,8 @@ struct State {
 struct Endpoint {
     id: u64,
     wake: Wake,
+    current_isolate: Option<CurrentIsolate>,
+    owner_isolate: usize,
     state: Mutex<State>,
     ready: Condvar,
     vtables: Mutex<HashMap<&'static str, Box<dyn Any + Send + Sync>>>,
@@ -94,7 +122,12 @@ impl Endpoint {
         let job = {
             let mut s = self.state.lock().unwrap();
             while wait && s.jobs.is_empty() {
-                s = self.ready.wait(s).unwrap();
+                let (next, timeout) =
+                    self.ready.wait_timeout(s, Duration::from_millis(10)).unwrap();
+                s = next;
+                if timeout.timed_out() {
+                    break;
+                }
             }
             s.jobs.pop_front()
         };
@@ -149,7 +182,11 @@ pub extern "C" fn uniffi_dispatch_unregister(ep: u64, handle: u64) {
     map.remove(&handle).unwrap();
 }
 fn dispatch<R: Send + 'static>(ep: &Arc<Endpoint>, f: impl FnOnce() -> R + Send + 'static) -> R {
-    if OWNERS.with(|owners| owners.borrow().last() == Some(&ep.id)) {
+    if OWNERS.with(|owners| owners.borrow().last() == Some(&ep.id))
+        || ep
+            .current_isolate
+            .is_some_and(|current| unsafe { current() as usize == ep.owner_isolate })
+    {
         return f();
     }
     let (tx, rx) = mpsc::sync_channel(1);
@@ -171,7 +208,8 @@ fn run<R: Send + 'static>(id: u64, f: impl FnOnce() -> R + Send + 'static) -> R 
     let notify = ep.clone();
     let (tx, rx) = mpsc::sync_channel(1);
     let worker = thread::spawn(move || {
-        tx.send(f()).unwrap();
+        let value = thread::spawn(f).join().unwrap();
+        tx.send(value).unwrap();
         notify.push(Box::new(|| {}));
     });
     let value = loop {
@@ -187,19 +225,41 @@ fn run<R: Send + 'static>(id: u64, f: impl FnOnce() -> R + Send + 'static) -> R 
     value
 }
 #[no_mangle]
-pub extern "C" fn uniffi_dispatch_create(wake: Wake) -> u64 {
+/// # Safety
+/// data must be NativeApi.initializeApiDLData from the current Dart VM.
+unsafe extern "C" fn uniffi_dispatch_create(wake: Wake, data: *const DartApi) -> u64 {
+    let Some(current_isolate) = current_isolate_api(data) else {
+        return 0;
+    };
+    let owner_isolate = current_isolate() as usize;
+    if owner_isolate == 0 {
+        return 0;
+    }
+    create_endpoint(wake, Some(current_isolate), owner_isolate)
+}
+fn create_endpoint(
+    wake: Wake,
+    current_isolate: Option<CurrentIsolate>,
+    owner_isolate: usize,
+) -> u64 {
     let id = next_id();
     endpoints().lock().unwrap().insert(
         id,
         Arc::new(Endpoint {
             id,
             wake,
+            current_isolate,
+            owner_isolate,
             state: Mutex::new(State::default()),
             ready: Condvar::new(),
             vtables: Mutex::new(HashMap::new()),
         }),
     );
     id
+}
+#[no_mangle]
+pub extern "C" fn uniffi_dispatch_has_routes(id: u64) -> bool {
+    routes().lock().unwrap().values().any(|route| route.endpoint == id)
 }
 #[no_mangle]
 pub extern "C" fn uniffi_dispatch_drain(id: u64) {
@@ -234,7 +294,7 @@ mod tests {
     extern "C" fn wake() {}
     #[test]
     fn close_waits_for_pending_notification() {
-        let id = uniffi_dispatch_create(wake);
+        let id = create_endpoint(wake, None, 0);
         let ep = endpoint(id);
         ep.push(Box::new(|| {}));
         assert!(!uniffi_dispatch_close(id));
@@ -244,8 +304,8 @@ mod tests {
     }
     #[test]
     fn close_keeps_other_isolates_routes_alive() {
-        let first = uniffi_dispatch_create(wake);
-        let second = uniffi_dispatch_create(wake);
+        let first = create_endpoint(wake, None, 0);
+        let second = create_endpoint(wake, None, 0);
         let handle = register(second, 1, "test");
         assert!(uniffi_dispatch_close(first));
         assert!(!uniffi_dispatch_close(second));
@@ -255,11 +315,41 @@ mod tests {
     }
     #[test]
     fn close_waits_for_active_call() {
-        let id = uniffi_dispatch_create(wake);
+        let id = create_endpoint(wake, None, 0);
         let ep = endpoint(id);
         ep.enter(false);
         assert!(!uniffi_dispatch_close(id));
         ep.leave();
+        assert!(uniffi_dispatch_close(id));
+    }
+    #[test]
+    fn owner_callback_outside_run_executes_inline() {
+        unsafe extern "C" fn current() -> *mut std::ffi::c_void {
+            7usize as *mut _
+        }
+        let id = create_endpoint(wake, Some(current), 7);
+        assert_eq!(dispatch(&endpoint(id), || 42), 42);
+        assert!(uniffi_dispatch_close(id));
+    }
+    #[test]
+    fn worker_thread_local_destructor_can_dispatch() {
+        struct OnExit(Arc<Endpoint>);
+        impl Drop for OnExit {
+            fn drop(&mut self) {
+                assert_eq!(dispatch(&self.0, || 42), 42);
+            }
+        }
+        thread_local! { static ON_EXIT: std::cell::RefCell<Option<OnExit>> = const { std::cell::RefCell::new(None) }; }
+        let id = create_endpoint(wake, None, 0);
+        let ep = endpoint(id);
+        assert_eq!(
+            run(id, move || {
+                ON_EXIT.with(|slot| *slot.borrow_mut() = Some(OnExit(ep)));
+                17
+            }),
+            17
+        );
+        while endpoint(id).pump(false) {}
         assert!(uniffi_dispatch_close(id));
     }
 }

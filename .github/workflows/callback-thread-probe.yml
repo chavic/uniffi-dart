@@ -15,12 +15,13 @@ permissions:
 
 jobs:
   probe:
-    name: Callback probe (${{ matrix.mode }})
-    runs-on: ubuntu-latest
+    name: Callback probe (${{ matrix.os }}, ${{ matrix.mode }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         mode: [jit, aot]
     steps:
       - uses: actions/checkout@v4
@@ -34,12 +35,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: '. -> target/relay-validation'
-      - name: Run the probe and failure controls
-        shell: bash
-        run: |
-          args=()
-          if [ '${{ matrix.mode }}' = aot ]; then args+=(--aot); fi
-          python3 fixtures/callback-thread-relay/probe/run.py --dart dart "${args[@]}"
       - name: Run generated dispatch and failure controls
         shell: bash
         run: |
@@ -50,10 +45,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: callback-probe-${{ matrix.mode }}
+          name: callback-probe-${{ matrix.os }}-${{ matrix.mode }}
           path: |
-            target/relay-results*/results.json
-            target/relay-results*/*.log
             target/generated-dispatch-*/results.json
             target/generated-dispatch-*/*.log
           if-no-files-found: warn

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import shutil
 import signal
 import subprocess
@@ -91,7 +92,7 @@ if args.aot:
     run('aot-build', [args.dart,'build','cli','--target','probe.dart','-o','aot'],cwd=package)
     runtime = [package/'aot/bundle/bin'/('probe.exe' if os.name=='nt' else 'probe')]
 else: runtime = [args.dart,'run','probe.dart']
-for case in ['direct','thread','parallel','clone','errors','nested','cross-nested','retained','retained-clone','repeat','isolates','rollback']:
+for case in ['no-callback','owner-direct','thread-local-drop','direct','thread','parallel','clone','errors','nested','cross-nested','retained','retained-clone','repeat','isolates','rollback']:
     run(case,[*runtime,case],cwd=package,timeout=45,marker='PASS generated '+case)
 # A stubbed return must not satisfy the original-object state assertion.
 probe = package/'probe.dart'
@@ -105,6 +106,24 @@ try:
     else: mutation = runtime
     run('state-control', [*mutation,'thread'],cwd=package,timeout=45,failure='thread callback')
 finally: probe.write_text(original)
+# A stale companion must fail loudly at dispatcher setup instead of calling
+# through mismatched dispatch_* signatures.
+component = package/'callback_thread_relay.dart'
+original_component = component.read_text()
+hash_match = re.search(r'_uniffiExpectedDispatchAbiHash = 0x([0-9a-f]{16});', original_component)
+assert hash_match, 'dispatch ABI hash constant missing from generated bindings'
+digits = hash_match.group(1)
+stale_hash = ('0' if digits[0] != '0' else '1') + digits[1:]
+component.write_text(original_component.replace(
+    hash_match.group(0), f'_uniffiExpectedDispatchAbiHash = 0x{stale_hash};'))
+try:
+    if args.aot:
+        run('stale-companion-build',[args.dart,'build','cli','--target','probe.dart','-o','stale-aot'],cwd=package)
+        stale_runtime = [package/'stale-aot/bundle/bin'/('probe.exe' if os.name=='nt' else 'probe')]
+    else: stale_runtime = runtime
+    run('stale-companion-control', [*stale_runtime,'thread'],cwd=package,timeout=45,
+        failure='does not match these bindings')
+finally: component.write_text(original_component)
 component = package/'callback_thread_relay.dart'
 original_component = component.read_text()
 marker = '_uniffiDispatchUnregister(endpoint, native);'

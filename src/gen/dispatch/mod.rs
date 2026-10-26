@@ -5,7 +5,7 @@ use genco::prelude::*;
 use std::collections::BTreeMap;
 use std::fmt::Write;
 use uniffi_bindgen::{
-    interface::{AsType, Callable, FfiDefinition, FfiFunction, FfiType, ObjectImpl, Type},
+    interface::{AsType, Callable, FfiDefinition, FfiFunction, FfiType, Type},
     ComponentInterface,
 };
 
@@ -35,10 +35,8 @@ fn result_type(t: Option<&FfiType>) -> String {
 }
 fn has_callback(t: &Type) -> bool {
     t.iter_types().any(|t| {
-        matches!(
-            t,
-            Type::CallbackInterface { .. } | Type::Object { imp: ObjectImpl::CallbackTrait, .. }
-        )
+        matches!(t, Type::CallbackInterface { .. })
+            || matches!(t, Type::Object { imp, .. } if imp.has_callback_interface())
     })
 }
 pub fn validate(ci: &ComponentInterface) -> Result<()> {
@@ -92,11 +90,8 @@ pub fn validate(ci: &ComponentInterface) -> Result<()> {
             }
         }
         if cb.iter_types().any(|t| {
-            matches!(
-                t,
-                Type::CallbackInterface { .. }
-                    | Type::Object { imp: ObjectImpl::CallbackTrait, .. }
-            )
+            matches!(t, Type::CallbackInterface { .. })
+                || matches!(t, Type::Object { imp, .. } if imp.has_callback_interface())
         }) {
             bail!("callback_dispatch does not yet support passing callback values through callback methods");
         }
@@ -105,6 +100,64 @@ pub fn validate(ci: &ComponentInterface) -> Result<()> {
 }
 pub fn is_adapter(fun: &FfiFunction) -> bool {
     fun.has_rust_call_status_arg() || fun.name().contains("_fn_init_callback_vtable_")
+}
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+/// Canonical description of every symbol the companion exports. A stale
+/// companion library reports a different hash and fails loudly at dispatcher
+/// setup instead of corrupting memory through mismatched signatures.
+pub fn abi_hash(ci: &ComponentInterface) -> u64 {
+    let mut canonical = String::from(
+        "runtime-v2\nuniffi_dispatch_create(wake,api)\nuniffi_dispatch_drain\nuniffi_dispatch_close\nuniffi_dispatch_unregister\nuniffi_dispatch_has_routes\n",
+    );
+    for def in ci.ffi_definitions() {
+        match def {
+            FfiDefinition::CallbackFunction(cb) => {
+                let mut args: Vec<_> =
+                    cb.arguments().iter().map(|a| native_type(&a.type_())).collect();
+                if cb.has_rust_call_status_arg() {
+                    args.push("*mut RustCallStatus".into());
+                }
+                writeln!(
+                    canonical,
+                    "callback {}: {}({})",
+                    cb.name(),
+                    result_type(cb.return_type()),
+                    args.join(", ")
+                )
+                .unwrap();
+            }
+            FfiDefinition::Struct(st) if st.name().starts_with("VTableCallbackInterface") => {
+                writeln!(canonical, "vtable {}", st.name()).unwrap();
+                for field in st.fields() {
+                    writeln!(canonical, "  {}: {}", field.name(), native_type(&field.type_()))
+                        .unwrap();
+                }
+            }
+            _ => {}
+        }
+    }
+    for fun in ci.iter_ffi_function_definitions().filter(is_adapter) {
+        let mut types: Vec<_> = fun.arguments().iter().map(|a| native_type(&a.type_())).collect();
+        if fun.has_rust_call_status_arg() {
+            types.push("*mut RustCallStatus".into());
+        }
+        writeln!(
+            canonical,
+            "dispatch_{}: {}({})",
+            fun.name(),
+            result_type(fun.return_type()),
+            types.join(", ")
+        )
+        .unwrap();
+    }
+    fnv1a64(canonical.as_bytes())
 }
 pub fn declaration(fun: &FfiFunction, asset: &str) -> dart::Tokens {
     let native_ret = fun
@@ -177,6 +230,7 @@ fn callback_names(ci: &ComponentInterface) -> Vec<String> {
 pub fn dart_runtime(ci: &ComponentInterface, config: &Config) -> dart::Tokens {
     let asset = format!("package:{}/{}_dispatch", config.package_name(), config.asset_id());
     let mut source = include_str!("dart.dart.txt").replace("@ASSET@", &asset);
+    writeln!(source, "const _uniffiExpectedDispatchAbiHash = 0x{:016x};", abi_hash(ci)).unwrap();
     for name in callback_names(ci) {
         let cls = DartCodeOracle::class_name(&name);
         writeln!(source, "@Native<Uint64 Function(Uint64, Uint64)>(assetId: _uniffiDispatchAsset, symbol: 'register_{name}')\nexternal int _register{cls}(int endpoint, int handle);\n").unwrap();
@@ -202,6 +256,11 @@ pub fn write_native(
     out: &camino::Utf8Path,
 ) -> Result<()> {
     let mut source = include_str!("runtime.rs.txt").to_owned();
+    writeln!(
+        source,
+        "#[no_mangle]\npub extern \"C\" fn uniffi_dispatch_abi_hash() -> u64 {{ 0x{:016x} }}",
+        abi_hash(ci)
+    )?;
     let mut callbacks = BTreeMap::new();
     let mut vtables = Vec::new();
     for def in ci.ffi_definitions() {
@@ -261,7 +320,7 @@ pub fn write_native(
             if fieldname == "uniffi_clone" {
                 writeln!(source, "register(r.endpoint, result, \"{kind}\")")?;
             } else if fieldname == "uniffi_free" {
-                writeln!(source, "routes().lock().unwrap().remove(&a0).unwrap(); result")?;
+                writeln!(source, "routes().lock().unwrap().remove(&a0).unwrap(); ep.push(Box::new(|| {{}})); result")?;
             } else {
                 writeln!(source, "result")?;
             }
@@ -316,7 +375,11 @@ pub fn write_native(
 mod tests {
     use super::*;
     fn component(body: &str) -> ComponentInterface {
-        ComponentInterface::from_webidl(body, "dispatch_test").unwrap()
+        let mut ci = ComponentInterface::from_webidl(body, "dispatch_test").unwrap();
+        // Production callers derive FFI signatures before generation (library
+        // mode does this); mirror that so the hash covers adapter signatures.
+        ci.derive_ffi_funcs().unwrap();
+        ci
     }
     #[test]
     fn reject_async_and_callback_return_paths_before_generation() {
@@ -336,5 +399,25 @@ mod tests {
         validate(&component("namespace test { u32 work(Sink sink); }; callback interface Sink { u32 work(bytes data); };" )).unwrap();
         let ci = component("namespace test {}; callback interface Sink { duration work(); };");
         assert!(validate(&ci).unwrap_err().to_string().contains("wire type"));
+    }
+    #[test]
+    fn abi_hash_tracks_every_companion_symbol() {
+        let base = component(
+            "namespace test { u32 echo(u32 v); }; callback interface Sink { u32 work(u32 v); };",
+        );
+        let first = abi_hash(&base);
+        assert_eq!(first, abi_hash(&base));
+        for changed in [
+            "namespace test { u32 echo(u16 v); }; callback interface Sink { u32 work(u32 v); };",
+            "namespace test { u32 echo(u32 v); }; callback interface Sink { u32 work(u16 v); };",
+            "namespace test { u32 echo(u32 v); u32 extra(); }; callback interface Sink { u32 work(u32 v); };",
+            "namespace test { u32 echo(u32 v); }; callback interface Sink { u32 work(u32 v); u32 more(); };",
+        ] {
+            assert_ne!(
+                first,
+                abi_hash(&component(changed)),
+                "hash unchanged for companion-changing API: {changed}"
+            );
+        }
     }
 }

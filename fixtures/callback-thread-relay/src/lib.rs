@@ -1,13 +1,9 @@
-//! Local experiment: keep generated Dart callbacks on their owner thread.
-//! The relay is fixture-specific and is not enabled in the generator.
+//! Runtime fixtures for opt-in generated callback dispatch.
 use std::sync::Arc;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Mutex,
 };
-
-mod owner_queue;
-mod relay;
 
 static SAVED: Mutex<Option<Arc<dyn Sink>>> = Mutex::new(None);
 static BACKGROUND: AtomicU64 = AtomicU64::new(0);
@@ -124,5 +120,22 @@ pub enum ArgumentPayload {
 }
 #[uniffi::export]
 pub fn call_with_payload(sink: Arc<dyn Sink>, _payload: ArgumentPayload) -> u64 {
+    sink.bytes(vec![42])
+}
+
+#[uniffi::export]
+pub fn echo_scalar(value: u32) -> u32 {
+    value
+}
+
+#[uniffi::export]
+pub fn save_until_thread_exit(sink: Arc<dyn Sink>) {
+    thread_local! { static AT_EXIT: std::cell::RefCell<Option<Arc<dyn Sink>>> = const { std::cell::RefCell::new(None) }; }
+    AT_EXIT.with(|slot| *slot.borrow_mut() = Some(sink));
+}
+
+#[no_mangle]
+pub extern "C" fn relay_call_saved_on_owner() -> u64 {
+    let sink = SAVED.lock().unwrap().take().unwrap();
     sink.bytes(vec![42])
 }
