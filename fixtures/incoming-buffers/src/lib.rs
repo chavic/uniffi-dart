@@ -25,8 +25,8 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 #[uniffi::export]
-pub fn live_bytes() -> u64 {
-    LIVE_BYTES.load(Ordering::Relaxed) as u64
+pub fn live_bytes() -> i64 {
+    LIVE_BYTES.load(Ordering::Relaxed) as i64
 }
 
 #[derive(uniffi::Record)]
@@ -83,22 +83,22 @@ pub fn panic_result() -> String {
 
 #[uniffi::export(with_foreign)]
 pub trait BufferConsumer: Send + Sync {
-    fn consume(&self, first: Vec<u8>, second: Vec<u8>) -> u64;
+    fn consume(&self, first: Vec<u8>, second: Vec<u8>) -> i64;
 }
 
 #[uniffi::export]
-pub fn send_buffers(consumer: Arc<dyn BufferConsumer>) -> u64 {
+pub fn send_buffers(consumer: Arc<dyn BufferConsumer>) -> i64 {
     consumer.consume(vec![4; 64], vec![5; 32])
 }
 
 #[uniffi::export(with_foreign)]
 #[async_trait::async_trait]
 pub trait AsyncBufferConsumer: Send + Sync {
-    async fn consume(&self, first: Vec<u8>, second: Vec<u8>) -> u64;
+    async fn consume(&self, first: Vec<u8>, second: Vec<u8>) -> i64;
 }
 
 #[uniffi::export]
-pub async fn send_buffers_async(consumer: Arc<dyn AsyncBufferConsumer>) -> u64 {
+pub async fn send_buffers_async(consumer: Arc<dyn AsyncBufferConsumer>) -> i64 {
     consumer.consume(vec![4; 64], vec![5; 32]).await
 }
 

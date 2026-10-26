@@ -168,8 +168,8 @@ impl Drop for InMemoryEventPersister {
 }
 
 #[uniffi::export]
-pub fn persister_drop_count() -> u64 {
-    PERSISTER_DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst) as u64
+pub fn persister_drop_count() -> i64 {
+    PERSISTER_DROP_COUNT.load(std::sync::atomic::Ordering::SeqCst) as i64
 }
 
 #[uniffi::export]

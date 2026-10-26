@@ -25,8 +25,8 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 #[uniffi::export]
-pub fn live_bytes() -> u64 {
-    LIVE_BYTES.load(Ordering::Relaxed) as u64
+pub fn live_bytes() -> i64 {
+    LIVE_BYTES.load(Ordering::Relaxed) as i64
 }
 
 #[derive(uniffi::Enum)]

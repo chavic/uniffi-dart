@@ -220,7 +220,7 @@ void main() {
     final consumer = Consumer();
     final handle = FfiConverterCallbackInterfaceBufferConsumer.lower(consumer);
     final status = calloc<RustCallStatus>();
-    final result = calloc<Uint64>();
+    final result = calloc<Int64>();
     try {
       final before = liveBytes();
       final malformed = toRustBuffer(Uint8List.fromList([0, 0, 1, 0]));

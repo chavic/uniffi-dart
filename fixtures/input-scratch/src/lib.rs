@@ -1,11 +1,11 @@
 #[uniffi::export]
-pub fn owned_len(value: Vec<u8>) -> u64 {
-    value.len() as u64
+pub fn owned_len(value: Vec<u8>) -> i64 {
+    value.len() as i64
 }
 
 #[uniffi::export]
-pub fn optional_len(value: Option<String>) -> u64 {
-    value.map_or(0, |s| s.len() as u64)
+pub fn optional_len(value: Option<String>) -> i64 {
+    value.map_or(0, |s| s.len() as i64)
 }
 
 #[uniffi::export]

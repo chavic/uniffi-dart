@@ -25,14 +25,14 @@ unsafe impl GlobalAlloc for CountingAllocator {
 static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 #[uniffi::export]
-pub fn live_bytes() -> u64 {
-    LIVE_BYTES.load(Ordering::Relaxed) as u64
+pub fn live_bytes() -> i64 {
+    LIVE_BYTES.load(Ordering::Relaxed) as i64
 }
 
 static LIVE_OBJECTS: AtomicUsize = AtomicUsize::new(0);
 #[uniffi::export]
-pub fn live_objects() -> u64 {
-    LIVE_OBJECTS.load(Ordering::Relaxed) as u64
+pub fn live_objects() -> i64 {
+    LIVE_OBJECTS.load(Ordering::Relaxed) as i64
 }
 
 #[derive(uniffi::Object, Debug, PartialEq, Eq, Hash)]
@@ -67,16 +67,16 @@ impl Tracked {
     pub fn as_async_trait(self: Arc<Self>) -> Arc<dyn AsyncConsumer> {
         self
     }
-    pub fn accept_two(&self, first: String, second: String) -> u64 {
-        (first.len() + second.len()) as u64
+    pub fn accept_two(&self, first: String, second: String) -> i64 {
+        (first.len() + second.len()) as i64
     }
-    pub fn references(self: Arc<Self>) -> u64 {
-        Arc::strong_count(&self) as u64
+    pub fn references(self: Arc<Self>) -> i64 {
+        Arc::strong_count(&self) as i64
     }
-    pub fn accept(&self, payload: String, small: u8) -> u64 {
+    pub fn accept(&self, payload: String, small: u8) -> i64 {
         take(payload, small)
     }
-    pub async fn accept_async(&self, payload: String, small: u8) -> u64 {
+    pub async fn accept_async(&self, payload: String, small: u8) -> i64 {
         take(payload, small)
     }
     pub fn as_rust_trait(self: Arc<Self>) -> Arc<dyn RustConsumer> {
@@ -94,52 +94,52 @@ pub struct Packet {
 }
 
 #[uniffi::export]
-pub fn take(payload: String, small: u8) -> u64 {
-    payload.len() as u64 + small as u64
+pub fn take(payload: String, small: u8) -> i64 {
+    payload.len() as i64 + small as i64
 }
 #[uniffi::export]
 pub fn take_void(payload: String, small: u8) {
     let _ = take(payload, small);
 }
 #[uniffi::export]
-pub async fn take_async(payload: String, small: u8) -> u64 {
+pub async fn take_async(payload: String, small: u8) -> i64 {
     take(payload, small)
 }
 #[uniffi::export]
-pub fn take_packet(packet: Packet, small: u8) -> u64 {
-    packet.objects.len() as u64 + small as u64
+pub fn take_packet(packet: Packet, small: u8) -> i64 {
+    packet.objects.len() as i64 + small as i64
 }
 #[uniffi::export]
-pub fn take_object(object: Arc<Tracked>, small: u8) -> u64 {
+pub fn take_object(object: Arc<Tracked>, small: u8) -> i64 {
     let _ = object;
-    small as u64
+    small as i64
 }
 
 #[uniffi::export]
 pub trait RustConsumer: Send + Sync {
-    fn accept(&self, payload: String, small: u8) -> u64;
+    fn accept(&self, payload: String, small: u8) -> i64;
 }
 impl RustConsumer for Tracked {
-    fn accept(&self, payload: String, small: u8) -> u64 {
+    fn accept(&self, payload: String, small: u8) -> i64 {
         take(payload, small)
     }
 }
 #[uniffi::export(with_foreign)]
 pub trait Consumer: Send + Sync {
-    fn accept(&self, payload: String, small: u8) -> u64;
+    fn accept(&self, payload: String, small: u8) -> i64;
 }
 impl Consumer for Tracked {
-    fn accept(&self, payload: String, small: u8) -> u64 {
+    fn accept(&self, payload: String, small: u8) -> i64 {
         take(payload, small)
     }
 }
 #[uniffi::export]
-pub fn take_callback(consumer: Arc<dyn Consumer>, small: u8) -> u64 {
+pub fn take_callback(consumer: Arc<dyn Consumer>, small: u8) -> i64 {
     consumer.accept(String::new(), small)
 }
 #[uniffi::export]
-pub fn colliding_names(uniffi_arguments: String, uniffi_arg0: u8, uniffi_arg01: u8) -> u64 {
-    take(uniffi_arguments, uniffi_arg0) + uniffi_arg01 as u64
+pub fn colliding_names(uniffi_arguments: String, uniffi_arg0: u8, uniffi_arg01: u8) -> i64 {
+    take(uniffi_arguments, uniffi_arg0) + uniffi_arg01 as i64
 }
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
@@ -148,12 +148,12 @@ pub enum Rejection {
     Rejected,
 }
 #[uniffi::export]
-pub fn reject(object: Arc<Tracked>, payload: String) -> Result<u64, Rejection> {
+pub fn reject(object: Arc<Tracked>, payload: String) -> Result<i64, Rejection> {
     let _ = (object, payload);
     Err(Rejection::Rejected)
 }
 #[uniffi::export]
-pub async fn reject_async(object: Arc<Tracked>, payload: String) -> Result<u64, Rejection> {
+pub async fn reject_async(object: Arc<Tracked>, payload: String) -> Result<i64, Rejection> {
     reject(object, payload)
 }
 
@@ -162,11 +162,11 @@ uniffi::include_scaffolding!("api");
 #[uniffi::export]
 #[async_trait::async_trait]
 pub trait AsyncConsumer: Send + Sync {
-    async fn accept(&self, payload: String, small: u8) -> u64;
+    async fn accept(&self, payload: String, small: u8) -> i64;
 }
 #[async_trait::async_trait]
 impl AsyncConsumer for Tracked {
-    async fn accept(&self, payload: String, small: u8) -> u64 {
+    async fn accept(&self, payload: String, small: u8) -> i64 {
         take(payload, small)
     }
 }
