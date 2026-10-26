@@ -60,6 +60,7 @@ impl Renderable for CallbackInterfaceCodeType {
             callback.name(),
             &callback.methods(),
             &ffi_module,
+            type_helper.callback_dispatch(),
         );
 
         quote! {
@@ -153,11 +154,12 @@ pub fn generate_callback_interface(
             }
 
             static int lower($cls_name value) {
+                $(if type_helper.callback_dispatch() => _uniffiDispatch.id;)
                 $lower_rust_impl
                 _ensureVTableInitialized();
                 final handle = _handleMap.insert(value);
                 UniffiArgumentScope.current?.own((_) { _handleMap.remove(handle); });
-                return handle;
+                return $(if type_helper.callback_dispatch() { $(format!("_uniffiRegister{}", cls_name))(handle) } else { handle });
             }
 
             static void _ensureVTableInitialized() {
@@ -648,6 +650,7 @@ pub fn generate_callback_interface_vtable_init_function(
     callback_name: &str,
     methods: &[&Method],
     ffi_module: &str,
+    callback_dispatch: bool,
 ) -> dart::Tokens {
     let vtable_name = &format!("UniffiVTableCallbackInterface{callback_name}");
     let vtable_static_instance_name =
@@ -673,10 +676,12 @@ pub fn generate_callback_interface_vtable_init_function(
 
             rustCall((status) {
                 uniffi_$(ffi_module)_fn_init_callback_vtable_$(snake_callback)(
-                    $(vtable_static_instance_name),
+                    $(&vtable_static_instance_name),
                 );
                 checkCallStatus(NullRustCallStatusErrorHandler(), status);
             });
+
+            $(if callback_dispatch => calloc.free($(&vtable_static_instance_name));)
 
             // Update the flag to prevent re-initialization
             FfiConverterCallbackInterface$(DartCodeOracle::class_name(callback_name))._vtableInitialized = true;

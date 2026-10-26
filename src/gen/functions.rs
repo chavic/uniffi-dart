@@ -59,22 +59,18 @@ pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) 
                 );
             }
         )
-    } else if ret == quote!(void) {
-        quote!(
-            $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                return rustCall(($call_status) {
-                    $(&call);
-                }, $error_handler);
-            }
-        )
     } else {
+        let invocation = if ret == quote!(void) {
+            quote!(rustCall(($call_status) { $(&call); }, $error_handler))
+        } else {
+            quote!(rustCallWithLifter(($call_status) => $(&call), $lifter, $error_handler))
+        };
+        let invocation = if type_helper.callback_dispatch() {
+            quote!(_uniffiDispatch.call(() => $invocation))
+        } else { invocation };
         quote!(
             $ret $(DartCodeOracle::fn_name(func.name()))($args) {
-                return rustCallWithLifter(
-                    ($call_status) => $(&call),
-                    $lifter,
-                    $error_handler
-                );
+                return $invocation;
             }
         )
     }

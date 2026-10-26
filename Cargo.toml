@@ -66,6 +66,7 @@ members = [
     "fixtures/library_config",
     "fixtures/callbacks",
     "fixtures/callback-ffi-types",
+    "fixtures/callback-thread-relay",
     "fixtures/benchmarks",
     "fixtures/custom_types",
     "fixtures/conversion-temporaries",
