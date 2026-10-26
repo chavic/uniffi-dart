@@ -323,8 +323,9 @@ pub fn generate_callback_functions(
         let param_types: Vec<dart::Tokens> = m
             .arguments()
             .iter()
-            .map(|arg| {
-                let arg_name = DartCodeOracle::var_name(arg.name());
+            .enumerate()
+            .map(|(index, arg)| {
+                let arg_name = format!("_uniffiRaw{index}");
                 DartCodeOracle::callback_param_type(&arg.as_type(), &arg_name)
             })
             .collect();
@@ -335,7 +336,7 @@ pub fn generate_callback_functions(
             .iter()
             .enumerate()
             .map(|(arg_idx, arg)| {
-                let arg_name = DartCodeOracle::var_name(arg.name());
+                let arg_name = format!("_uniffiRaw{arg_idx}");
                 DartCodeOracle::callback_arg_lift_indexed(&arg.as_type(), &arg_name, arg_idx)
             })
             .collect();
