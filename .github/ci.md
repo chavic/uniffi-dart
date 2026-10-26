@@ -10,12 +10,7 @@ The Nix flake check validates repository formatting. Dev-shell jobs verify that
 Rust, Cargo, cargo-nextest and Dart can run, stopping at the first failed tool.
 Runtime coverage comes from the Testing workflow.
 
-The downstream workflow generates bindings using this checkout and runs Payjoin
-and BDK tests. Routine BDK runs report their passing, failed and skipped counts
-in the job summary. They do not require live Bitcoin testnet servers.
-
-To run BDK integration tests, manually run **Test Downstream**, select the branch
-to check, and supply Bitcoin testnet Electrum and Esplora API URLs. These inputs
-must point to testnet, which the downstream fixtures use. That run enables all
-BDK tests and fails if any tests are skipped, if no tests pass, or if the test
-report is incomplete. It requires reachable servers for the duration of the run.
+The existing downstream workflow generates bindings using this checkout and runs
+Payjoin and BDK tests. Those suites can skip network integration tests, so a
+successful downstream job does not establish that live-server integration ran.
+Downstream coverage policy is separate from failure propagation in this PR.
