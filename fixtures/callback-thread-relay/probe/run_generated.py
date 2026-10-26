@@ -59,7 +59,7 @@ prefix = '' if os.name == 'nt' else 'lib'
 library = prefix + 'callback_thread_relay' + suffix
 companion = prefix + 'callback_thread_relay_dart_dispatch' + suffix
 generator = target / 'debug' / ('uniffi_bindgen_dart.exe' if os.name == 'nt' else 'uniffi_bindgen_dart')
-run('build', ['cargo','+'+args.toolchain,'build','-p','uniffi-dart','-p','callback_thread_relay','--features','uniffi-dart/binary'])
+run('build', ['cargo','+'+args.toolchain,'build','-p','uniffi-dart','-p','callback_thread_relay','--all-features','--features','uniffi/cli,uniffi/scaffolding-ffi-buffer-fns'])
 config = output / 'uniffi.toml'
 config.write_text('[bindings.dart]\npackage_name = "relay_probe"\ncdylib_name = "callback_thread_relay"\ncallback_dispatch = true\n')
 package = output / 'package'

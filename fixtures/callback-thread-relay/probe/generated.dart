@@ -2,7 +2,39 @@ import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
-import 'callback_thread_relay.dart';
+import 'callback_thread_relay.dart'
+    hide
+        callBytesDirect,
+        callBytesThread,
+        callBytesParallel,
+        callCloneThread,
+        callCrossNested,
+        callSavedThread,
+        callWithPayload;
+import 'callback_thread_relay.dart' as bindings;
+
+int counterValue(Object value) {
+  if (value is BigInt) {
+    check(value.bitLength <= 63, 'counter exceeded checked int range');
+    return value.toInt();
+  }
+  return value as int;
+}
+
+int callBytesDirect({required Sink sink}) =>
+    counterValue(bindings.callBytesDirect(sink: sink));
+int callBytesThread({required Sink sink}) =>
+    counterValue(bindings.callBytesThread(sink: sink));
+int callBytesParallel({required Sink sink}) =>
+    counterValue(bindings.callBytesParallel(sink: sink));
+int callCloneThread({required Sink sink}) =>
+    counterValue(bindings.callCloneThread(sink: sink));
+int callCrossNested({required Sink sink}) =>
+    counterValue(bindings.callCrossNested(sink: sink));
+int callSavedThread({required Sink sink}) =>
+    counterValue(bindings.callSavedThread(sink: sink));
+int callWithPayload({required Sink sink, required ArgumentPayload payload}) =>
+    counterValue(bindings.callWithPayload(sink: sink, payload: payload));
 
 @Native<Uint64 Function()>(
   assetId: 'package:relay_probe/uniffi:callback_thread_relay',

@@ -67,7 +67,9 @@ pub fn generate_function(func: &Function, type_helper: &dyn TypeHelperRenderer) 
         };
         let invocation = if type_helper.callback_dispatch() {
             quote!(_uniffiDispatch.call(() => $invocation))
-        } else { invocation };
+        } else {
+            invocation
+        };
         quote!(
             $ret $(DartCodeOracle::fn_name(func.name()))($args) {
                 return $invocation;

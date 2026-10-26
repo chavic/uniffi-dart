@@ -129,8 +129,15 @@ void main() {
   pureConsumerFreeCallback(pureHandle);
   tracker.calloc.retainForProcessLifetime();
   tearDown(() {
-    try { expect(tracker.calloc.live, isEmpty, reason: 'native scratch must balance'); }
-    finally { tracker.calloc.reset(); }
+    try {
+      expect(
+        tracker.calloc.live,
+        isEmpty,
+        reason: 'native scratch must balance',
+      );
+    } finally {
+      tracker.calloc.reset();
+    }
     expect(
       liveObjects(),
       0,
