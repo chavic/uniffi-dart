@@ -367,7 +367,7 @@ pub fn runtime_scaffolding(ci: &ComponentInterface) -> dart::Tokens {
                 }
             }
 
-            void uniffiFreeRustBuffer(Object? value) {
+            void uniffiFreeRustBuffer<V>(V value) {
                 if (value is RustBuffer) {
                     value.free();
                 }
