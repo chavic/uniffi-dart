@@ -2,7 +2,24 @@ import 'package:test/test.dart';
 
 import '../callbacks.dart';
 
+class Observer implements DisposalObserver {
+  late ReentrantDisposable object;
+  int calls = 0;
+  @override
+  void dropping() {
+    calls++;
+    object.dispose();
+  }
+}
+
 void main() {
+  test('native destructor reentry observes the disposed state', () {
+    final observer = Observer();
+    observer.object = ReentrantDisposable(observer: observer);
+    observer.object.dispose();
+    observer.object.dispose();
+    expect(observer.calls, 1);
+  });
   test(
     'Rust-backed foreign trait rejects calls and lowering after disposal',
     () {
