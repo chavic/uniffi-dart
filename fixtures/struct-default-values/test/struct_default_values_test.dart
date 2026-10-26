@@ -3,6 +3,10 @@ import 'package:test/test.dart';
 import '../struct_default_values.dart';
 
 void main() {
+  test('dollar signs in function argument defaults', () {
+    expect(echoDefaultArgument(), r'$amount');
+    expect(echoDefaultArgument(value: 'explicit'), 'explicit');
+  });
   test('UDL string defaults preserve literal interpolation syntax', () {
     final value = UdlStringDefaults();
     expect(value.identifier, r'$amount');

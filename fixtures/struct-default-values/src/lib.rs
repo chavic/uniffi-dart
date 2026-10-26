@@ -34,3 +34,8 @@ pub fn echo_string_defaults(value: StringDefaults) -> StringDefaults {
 }
 
 uniffi::include_scaffolding!("api");
+
+#[uniffi::export(default(value = "$amount"))]
+pub fn echo_default_argument(value: String) -> String {
+    value
+}
