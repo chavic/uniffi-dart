@@ -241,7 +241,9 @@ pub fn dart_runtime(ci: &ComponentInterface, config: &Config) -> dart::Tokens {
   final native = _register{cls}(endpoint, handle);
   _uniffiDispatch.onLowered(() {{
     _uniffiDispatchUnregister(endpoint, native);
-    FfiConverterCallbackInterface{cls}._handleMap.remove(handle);
+    // Argument rollback may have already released the local handle.
+    // Dispatch still owns the native route until it is unregistered above.
+    FfiConverterCallbackInterface{cls}._handleMap.maybeRemove(handle);
   }});
   return native;
 }}"
